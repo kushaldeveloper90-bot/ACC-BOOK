@@ -19,6 +19,33 @@ if not app.debug:
 
 app.secret_key = 'accounting_secret_key_2025'
 
+def to_float(val, default=0.0):
+    if val is None:
+        return default
+    if isinstance(val, (int, float)):
+        return float(val)
+    val_str = str(val).strip()
+    if not val_str:
+        return default
+    try:
+        return float(val_str)
+    except (ValueError, TypeError):
+        return default
+
+def to_int(val, default=0):
+    if val is None:
+        return default
+    if isinstance(val, int):
+        return val
+    val_str = str(val).strip()
+    if not val_str:
+        return default
+    try:
+        return int(float(val_str))
+    except (ValueError, TypeError):
+        return default
+
+
 @app.template_filter('format_date')
 def format_date(value):
     if not value:
@@ -59,11 +86,20 @@ def get_system_db():
     return conn
 
 def get_db():
-    active_db_filename = session.get('active_db')
-    if active_db_filename:
-        db_path = os.path.join(INSTANCE_DIR, active_db_filename)
+    active_db_filename = session.get('active_db', 'accounting.db')
+    db_path = os.path.join(INSTANCE_DIR, active_db_filename)
+    if not os.path.exists(db_path):
+        try: init_db(active_db_filename)
+        except Exception: pass
     else:
-        db_path = DB
+        try:
+            test_c = sqlite3.connect(db_path)
+            t = test_c.cursor().execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").fetchone()
+            test_c.close()
+            if not t: init_db(active_db_filename)
+        except Exception:
+            try: init_db(active_db_filename)
+            except Exception: pass
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
@@ -794,7 +830,7 @@ def new_income():
         inc_date = request.form['inc_date']
         category = request.form['category']
         payer = request.form['payer']
-        amount = float(request.form.get('amount', 0))
+        amount = to_float(request.form.get('amount', 0))
         description = request.form.get('description', '')
         status = request.form['status']
         payment_mode = request.form.get('payment_mode', '')
@@ -836,7 +872,7 @@ def edit_income(inc_id):
         inc_date = request.form['inc_date']
         category = request.form['category']
         payer = request.form['payer']
-        amount = float(request.form.get('amount', 0))
+        amount = to_float(request.form.get('amount', 0))
         description = request.form.get('description', '')
         status = request.form['status']
         payment_mode = request.form.get('payment_mode', '')
@@ -886,7 +922,7 @@ def new_other_expense():
         exp_date = request.form['exp_date']
         category = request.form['category']
         payee = request.form['payee']
-        amount = float(request.form.get('amount', 0))
+        amount = to_float(request.form.get('amount', 0))
         description = request.form.get('description', '')
         status = request.form['status']
         payment_mode = request.form.get('payment_mode', '')
@@ -927,7 +963,7 @@ def edit_other_expense(exp_id):
         exp_date = request.form['exp_date']
         category = request.form['category']
         payee = request.form['payee']
-        amount = float(request.form.get('amount', 0))
+        amount = to_float(request.form.get('amount', 0))
         description = request.form.get('description', '')
         status = request.form['status']
         payment_mode = request.form.get('payment_mode', '')
@@ -981,7 +1017,7 @@ def new_expense():
         exp_date = request.form['exp_date']
         category = request.form['category']
         payee = request.form['payee']
-        amount = float(request.form.get('amount', 0))
+        amount = to_float(request.form.get('amount', 0))
         description = request.form.get('description', '')
         status = request.form['status']
         payment_mode = request.form.get('payment_mode', '')
@@ -1037,7 +1073,7 @@ def edit_expense(exp_id):
         exp_date = request.form['exp_date']
         category = request.form['category']
         payee = request.form['payee']
-        amount = float(request.form.get('amount', 0))
+        amount = to_float(request.form.get('amount', 0))
         description = request.form.get('description', '')
         status = request.form['status']
         payment_mode = request.form.get('payment_mode', '')
@@ -1349,7 +1385,7 @@ def add_party():
     conn.execute("INSERT INTO parties (name,type,phone,address,state,city,gstin,opening_balance) VALUES (?,?,?,?,?,?,?,?)",
         (request.form['name'], request.form['type'], request.form.get('phone',''),
          request.form.get('address',''), request.form.get('state',''), request.form.get('city',''),
-         request.form.get('gstin',''), float(request.form.get('opening_balance',0))))
+         request.form.get('gstin',''), to_float(request.form.get('opening_balance',0))))
     conn.commit()
     conn.close()
     flash('Party added successfully.', 'success')
@@ -1364,7 +1400,7 @@ def edit_party(party_id):
         conn.execute("UPDATE parties SET name=?, type=?, phone=?, address=?, state=?, city=?, gstin=?, opening_balance=? WHERE id=?",
             (request.form['name'], request.form['type'], request.form.get('phone',''),
              request.form.get('address',''), request.form.get('state',''), request.form.get('city',''),
-             request.form.get('gstin',''), float(request.form.get('opening_balance',0)), party_id))
+             request.form.get('gstin',''), to_float(request.form.get('opening_balance',0)), party_id))
         conn.commit()
         conn.close()
         flash('Party updated successfully.', 'success')
@@ -1434,25 +1470,28 @@ def new_invoice():
     """).fetchall()
     if request.method == 'POST':
         items = []
-        subtotal = 0
-        i = 0
-        while f'desc_{i}' in request.form:
-            desc = request.form[f'desc_{i}']
-            qty = float(request.form.get(f'qty_{i}', 1))
-            rate = float(request.form.get(f'rate_{i}', 0))
-            amt = qty * rate
-            subtotal += amt
-            items.append((desc, qty, rate, amt))
-            i += 1
-            i += 1
+        subtotal = 0.0
+        row_indices = set()
+        for k in request.form:
+            if k.startswith('desc_'):
+                try: row_indices.add(int(k.split('_')[1]))
+                except ValueError: pass
+        for i in sorted(row_indices):
+            desc = request.form.get(f'desc_{i}', '').strip()
+            if desc:
+                qty = to_float(request.form.get(f'qty_{i}'), 1.0)
+                rate = to_float(request.form.get(f'rate_{i}'), 0.0)
+                amt = qty * rate
+                subtotal += amt
+                items.append((desc, qty, rate, amt))
             
-        discount_pct = float(request.form.get('discount_pct', 0))
+        discount_pct = to_float(request.form.get('discount_pct', 0))
         discount_amount = subtotal * (discount_pct / 100)
         taxable_amount = subtotal - discount_amount
         
-        cgst_pct = float(request.form.get('cgst_pct', 0))
-        sgst_pct = float(request.form.get('sgst_pct', 0))
-        igst_pct = float(request.form.get('igst_pct', 0))
+        cgst_pct = to_float(request.form.get('cgst_pct', 0))
+        sgst_pct = to_float(request.form.get('sgst_pct', 0))
+        igst_pct = to_float(request.form.get('igst_pct', 0))
         
         cgst_amount = taxable_amount * (cgst_pct / 100)
         sgst_amount = taxable_amount * (sgst_pct / 100)
@@ -1461,10 +1500,10 @@ def new_invoice():
         tax_amt = cgst_amount + sgst_amount + igst_amount
         total = taxable_amount + tax_amt
         
-        inv_no = request.form['invoice_no']
+        inv_no = request.form.get('invoice_no', '').strip()
         party_id = request.form.get('party_id') or None
-        party_name = request.form['party_name']
-        inv_date = request.form['invoice_date']
+        party_name = request.form.get('party_name', '').strip() or 'Direct Customer'
+        inv_date = request.form.get('invoice_date', date.today().isoformat())
         notes = request.form.get('notes','')
         c = conn.cursor()
         place_of_supply = request.form.get('place_of_supply', '')
@@ -1488,7 +1527,7 @@ def new_invoice():
                   (inv_date,'invoice',inv_id,inv_no,party_id,party_name,f'Invoice {inv_no}',total,0,current_user.id))
                   
         # Instant Payment Handling
-        payment_amount = float(request.form.get('payment_amount', 0) or 0)
+        payment_amount = to_float(request.form.get('payment_amount', 0) or 0)
         if payment_amount > 0:
             payment_mode = request.form.get('payment_mode', 'Cash')
             bank_source = request.form.get('bank_source', '').strip()
@@ -1531,25 +1570,28 @@ def edit_invoice(inv_id):
         
     if request.method == 'POST':
         items = []
-        subtotal = 0
-        i = 0
-        while f'desc_{i}' in request.form:
-            desc = request.form[f'desc_{i}']
-            qty = float(request.form.get(f'qty_{i}', 1))
-            rate = float(request.form.get(f'rate_{i}', 0))
-            amt = qty * rate
-            subtotal += amt
-            items.append((desc, qty, rate, amt))
-            i += 1
-            i += 1
+        subtotal = 0.0
+        row_indices = set()
+        for k in request.form:
+            if k.startswith('desc_'):
+                try: row_indices.add(int(k.split('_')[1]))
+                except ValueError: pass
+        for i in sorted(row_indices):
+            desc = request.form.get(f'desc_{i}', '').strip()
+            if desc:
+                qty = to_float(request.form.get(f'qty_{i}'), 1.0)
+                rate = to_float(request.form.get(f'rate_{i}'), 0.0)
+                amt = qty * rate
+                subtotal += amt
+                items.append((desc, qty, rate, amt))
             
-        discount_pct = float(request.form.get('discount_pct', 0))
+        discount_pct = to_float(request.form.get('discount_pct', 0))
         discount_amount = subtotal * (discount_pct / 100)
         taxable_amount = subtotal - discount_amount
         
-        cgst_pct = float(request.form.get('cgst_pct', 0))
-        sgst_pct = float(request.form.get('sgst_pct', 0))
-        igst_pct = float(request.form.get('igst_pct', 0))
+        cgst_pct = to_float(request.form.get('cgst_pct', 0))
+        sgst_pct = to_float(request.form.get('sgst_pct', 0))
+        igst_pct = to_float(request.form.get('igst_pct', 0))
         
         cgst_amount = taxable_amount * (cgst_pct / 100)
         sgst_amount = taxable_amount * (sgst_pct / 100)
@@ -1558,10 +1600,10 @@ def edit_invoice(inv_id):
         tax_amt = cgst_amount + sgst_amount + igst_amount
         total = taxable_amount + tax_amt
         
-        inv_no = request.form['invoice_no']
+        inv_no = request.form.get('invoice_no', '').strip()
         party_id = request.form.get('party_id') or None
-        party_name = request.form['party_name']
-        inv_date = request.form['invoice_date']
+        party_name = request.form.get('party_name', '').strip() or 'Direct Customer'
+        inv_date = request.form.get('invoice_date', date.today().isoformat())
         notes = request.form.get('notes','')
         c = conn.cursor()
         place_of_supply = request.form.get('place_of_supply', '')
@@ -1675,25 +1717,28 @@ def new_purchase():
     """).fetchall()
     if request.method == 'POST':
         items = []
-        subtotal = 0
-        i = 0
-        while f'desc_{i}' in request.form:
-            desc = request.form[f'desc_{i}']
-            qty = float(request.form.get(f'qty_{i}', 1))
-            rate = float(request.form.get(f'rate_{i}', 0))
-            amt = qty * rate
-            subtotal += amt
-            items.append((desc, qty, rate, amt))
-            i += 1
-            i += 1
+        subtotal = 0.0
+        row_indices = set()
+        for k in request.form:
+            if k.startswith('desc_'):
+                try: row_indices.add(int(k.split('_')[1]))
+                except ValueError: pass
+        for i in sorted(row_indices):
+            desc = request.form.get(f'desc_{i}', '').strip()
+            if desc:
+                qty = to_float(request.form.get(f'qty_{i}'), 1.0)
+                rate = to_float(request.form.get(f'rate_{i}'), 0.0)
+                amt = qty * rate
+                subtotal += amt
+                items.append((desc, qty, rate, amt))
             
-        discount_pct = float(request.form.get('discount_pct', 0))
+        discount_pct = to_float(request.form.get('discount_pct', 0))
         discount_amount = subtotal * (discount_pct / 100)
         taxable_amount = subtotal - discount_amount
         
-        cgst_pct = float(request.form.get('cgst_pct', 0))
-        sgst_pct = float(request.form.get('sgst_pct', 0))
-        igst_pct = float(request.form.get('igst_pct', 0))
+        cgst_pct = to_float(request.form.get('cgst_pct', 0))
+        sgst_pct = to_float(request.form.get('sgst_pct', 0))
+        igst_pct = to_float(request.form.get('igst_pct', 0))
         
         cgst_amount = taxable_amount * (cgst_pct / 100)
         sgst_amount = taxable_amount * (sgst_pct / 100)
@@ -1704,7 +1749,7 @@ def new_purchase():
         
         bill_no = request.form.get('bill_no', '')
         party_id = request.form.get('party_id') or None
-        party_name = request.form['party_name']
+        party_name = request.form.get('party_name', '').strip() or 'Direct Customer'
         bill_date = request.form['bill_date']
         category = request.form.get('category', 'Inventory / Stock')
         notes = request.form.get('notes','')
@@ -1730,7 +1775,7 @@ def new_purchase():
                   (bill_date,'purchase',pur_id,bill_no,party_id,party_name,f'Purchase {bill_no}',0,total,current_user.id))
 
         # Instant Payment Handling
-        payment_amount = float(request.form.get('payment_amount', 0) or 0)
+        payment_amount = to_float(request.form.get('payment_amount', 0) or 0)
         if payment_amount > 0:
             payment_mode = request.form.get('payment_mode', 'Cash')
             bank_source = request.form.get('bank_source', '').strip()
@@ -1774,25 +1819,28 @@ def edit_purchase(pur_id):
         
     if request.method == 'POST':
         items = []
-        subtotal = 0
-        i = 0
-        while f'desc_{i}' in request.form:
-            desc = request.form[f'desc_{i}']
-            qty = float(request.form.get(f'qty_{i}', 1))
-            rate = float(request.form.get(f'rate_{i}', 0))
-            amt = qty * rate
-            subtotal += amt
-            items.append((desc, qty, rate, amt))
-            i += 1
-            i += 1
+        subtotal = 0.0
+        row_indices = set()
+        for k in request.form:
+            if k.startswith('desc_'):
+                try: row_indices.add(int(k.split('_')[1]))
+                except ValueError: pass
+        for i in sorted(row_indices):
+            desc = request.form.get(f'desc_{i}', '').strip()
+            if desc:
+                qty = to_float(request.form.get(f'qty_{i}'), 1.0)
+                rate = to_float(request.form.get(f'rate_{i}'), 0.0)
+                amt = qty * rate
+                subtotal += amt
+                items.append((desc, qty, rate, amt))
             
-        discount_pct = float(request.form.get('discount_pct', 0))
+        discount_pct = to_float(request.form.get('discount_pct', 0))
         discount_amount = subtotal * (discount_pct / 100)
         taxable_amount = subtotal - discount_amount
         
-        cgst_pct = float(request.form.get('cgst_pct', 0))
-        sgst_pct = float(request.form.get('sgst_pct', 0))
-        igst_pct = float(request.form.get('igst_pct', 0))
+        cgst_pct = to_float(request.form.get('cgst_pct', 0))
+        sgst_pct = to_float(request.form.get('sgst_pct', 0))
+        igst_pct = to_float(request.form.get('igst_pct', 0))
         
         cgst_amount = taxable_amount * (cgst_pct / 100)
         sgst_amount = taxable_amount * (sgst_pct / 100)
@@ -1803,7 +1851,7 @@ def edit_purchase(pur_id):
         
         bill_no = request.form.get('bill_no', '')
         party_id = request.form.get('party_id') or None
-        party_name = request.form['party_name']
+        party_name = request.form.get('party_name', '').strip() or 'Direct Customer'
         bill_date = request.form['bill_date']
         category = request.form.get('category', 'Inventory / Stock')
         notes = request.form.get('notes','')
@@ -1901,7 +1949,7 @@ def add_receipt():
     conn = get_db()
     party_id = request.form.get('party_id') or None
     party_name = request.form.get('party_name','')
-    amount = float(request.form.get('amount',0))
+    amount = to_float(request.form.get('amount',0))
     r_date = request.form['receipt_date']
     payment_mode = request.form.get('payment_mode', 'Cash')
     bank_source = request.form.get('bank_source', '').strip()
@@ -1946,7 +1994,7 @@ def add_payment():
     conn = get_db()
     party_id = request.form.get('party_id') or None
     party_name = request.form.get('party_name','')
-    amount = float(request.form.get('amount',0))
+    amount = to_float(request.form.get('amount',0))
     r_date = request.form['payment_date']
     payment_mode = request.form.get('payment_mode', 'Cash')
     bank_source = request.form.get('bank_source', '').strip()
@@ -1981,7 +2029,7 @@ def edit_receipt(receipt_id):
     if request.method == 'POST':
         party_id = request.form.get('party_id') or None
         party_name = request.form.get('party_name','')
-        amount = float(request.form.get('amount',0))
+        amount = to_float(request.form.get('amount',0))
         r_date = request.form['receipt_date']
         payment_mode = request.form.get('payment_mode', 'Cash')
         bank_source = request.form.get('bank_source', '').strip()
@@ -2141,7 +2189,7 @@ def transfer():
         transfer_date = request.form['transfer_date']
         from_account = request.form['from_account']
         to_account = request.form['to_account']
-        amount = float(request.form['amount'] or 0)
+        amount = to_float(request.form.get('amount'), 0.0)
         notes = request.form['notes']
         
         conn.execute('''
@@ -2173,7 +2221,7 @@ def edit_transfer(transfer_id):
         transfer_date = request.form['transfer_date']
         from_account = request.form['from_account']
         to_account = request.form['to_account']
-        amount = float(request.form['amount'] or 0)
+        amount = to_float(request.form.get('amount'), 0.0)
         notes = request.form['notes']
         
         conn.execute('''
@@ -2263,8 +2311,8 @@ def company():
         gstin = request.form.get('gstin')
         state = request.form.get('state')
         bank = request.form.get('bank_details')
-        cash = float(request.form.get('cash_opening', 0))
-        bank_op = float(request.form.get('bank_opening', 0))
+        cash = to_float(request.form.get('cash_opening', 0))
+        bank_op = to_float(request.form.get('bank_opening', 0))
         
         file = request.files.get('logo')
         logo_filename = request.form.get('current_logo')
@@ -2310,11 +2358,25 @@ def products():
 @login_required
 def add_product():
     conn = get_db()
-    conn.execute("INSERT INTO products (name, description, price, hsn, opening_stock) VALUES (?,?,?,?,?)",
-                 (request.form['name'], request.form.get('description',''), float(request.form.get('price', 0)), request.form.get('hsn',''), float(request.form.get('opening_stock', 0))))
-    conn.commit()
-    conn.close()
-    flash('Product added.', 'success')
+    name = request.form.get('name', '').strip()
+    if not name:
+        flash('Product name is required.', 'error')
+        conn.close()
+        return redirect(url_for('products'))
+    desc = request.form.get('description', '').strip()
+    price = to_float(request.form.get('price'), 0.0)
+    hsn = request.form.get('hsn', '').strip()
+    opening_stock = to_float(request.form.get('opening_stock'), 0.0)
+    try:
+        conn.execute("INSERT INTO products (name, description, price, hsn, opening_stock) VALUES (?,?,?,?,?)",
+                     (name, desc, price, hsn, opening_stock))
+        conn.commit()
+        flash('Product added successfully.', 'success')
+    except Exception as e:
+        app.logger.error(f"Error adding product: {e}")
+        flash(f'Error adding product: {e}', 'error')
+    finally:
+        conn.close()
     return redirect(url_for('products'))
 
 @app.route('/product_list')
@@ -2338,7 +2400,7 @@ def edit_product(id):
     product = conn.execute("SELECT * FROM products WHERE id=?", (id,)).fetchone()
     if request.method == 'POST':
         conn.execute("UPDATE products SET name=?, description=?, price=?, hsn=?, opening_stock=? WHERE id=?",
-                     (request.form['name'], request.form.get('description',''), float(request.form.get('price', 0)), request.form.get('hsn',''), float(request.form.get('opening_stock', 0)), id))
+                     (request.form['name'], request.form.get('description',''), to_float(request.form.get('price', 0)), request.form.get('hsn',''), to_float(request.form.get('opening_stock', 0)), id))
         conn.commit()
         conn.close()
         flash('Product updated.', 'success')
@@ -2618,7 +2680,7 @@ def add_project():
     name = request.form['name']
     client_name = request.form.get('client_name', '')
     description = request.form.get('description', '')
-    budget = float(request.form.get('budget', 0))
+    budget = to_float(request.form.get('budget', 0))
     status = request.form.get('status', 'Active')
     
     conn = get_db()
@@ -2635,7 +2697,7 @@ def edit_project(project_id):
     name = request.form['name']
     client_name = request.form.get('client_name', '')
     description = request.form.get('description', '')
-    budget = float(request.form.get('budget', 0))
+    budget = to_float(request.form.get('budget', 0))
     status = request.form.get('status', 'Active')
     
     conn = get_db()
@@ -2693,9 +2755,9 @@ def add_timesheet():
     employee_name = request.form['employee_name']
     task_date = request.form['task_date']
     rate_type = request.form.get('rate_type', 'Hourly')
-    hours = float(request.form.get('hours', 0))
+    hours = to_float(request.form.get('hours', 0))
     task_description = request.form.get('task_description', '')
-    hourly_rate = float(request.form.get('hourly_rate', 0))
+    hourly_rate = to_float(request.form.get('hourly_rate', 0))
     
     conn = get_db()
     conn.execute('''INSERT INTO timesheets (project_id, employee_name, task_date, hours, task_description, hourly_rate, rate_type)
