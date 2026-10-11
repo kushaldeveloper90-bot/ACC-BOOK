@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Transfer List{% endblock %}
+{% block page_title %}Cash-Bank Transfers{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+    <div class="card-title" style="margin:0;">Transfer History</div>
+    <div style="display:flex; gap:12px; align-items:center; flex:1; max-width:400px; position:relative;">
+      <span style="position:absolute; left:12px; color:var(--muted); pointer-events:none;">🔍</span>
+      <input type="text" id="transferSearch" onkeyup="filterTransfers()" placeholder="Search by date, account, or notes..." style="width:100%; border:1px solid var(--border); border-radius:8px; padding:10px 10px 10px 36px; background:var(--bg); color:var(--text);">
+    </div>
+    <a href="{{ url_for('transfer') }}" class="btn btn-primary" style="white-space:nowrap;">+ Record Transfer</a>
+  </div>
+  
+  <div class="table-wrapper">
+    <table class="items-table" style="width:100%;">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Date</th>
+          <th>From Account</th>
+          <th>To Account</th>
+          <th>Notes</th>
+          <th style="text-align:right;">Amount (₹)</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transfers %}
+        <tr ondblclick="window.location.href='{{ url_for('edit_transfer', transfer_id=t['id']) }}'" style="cursor: pointer;" title="Double-click to edit">
+          <td>{{ t['id'] }}</td>
+          <td>{{ t['transfer_date'] }}</td>
+          <td style="color:{% if t['from_account']=='Cash' %}#10b981{% else %}#0ea5e9{% endif %}; fw-bold">{{ t['from_account'] }}</td>
+          <td style="color:{% if t['to_account']=='Cash' %}#10b981{% else %}#0ea5e9{% endif %}; fw-bold">{{ t['to_account'] }}</td>
+          <td>{{ t['notes'] or '—' }}</td>
+          <td align="right" class="fw-bold">₹{{ "{:,.2f}".format(t['amount']) }}</td>
+          <td style="text-align:right; white-space:nowrap;">
+            <a href="{{ url_for('edit_transfer', transfer_id=t['id']) }}" class="btn btn-sm btn-outline">View/Edit</a>
+            <a href="{{ url_for('delete_transfer', transfer_id=t['id']) }}" class="btn btn-sm" style="color:var(--danger); border-color:var(--danger);" onclick="return confirm('Are you sure you want to delete this transfer?');">Delete</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center" style="color:var(--muted); padding:20px;">No transfers found. <a href="{{ url_for('transfer') }}">Record one now</a>.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function filterTransfers() {
+  let input = document.getElementById('transferSearch');
+  let filter = input.value.toLowerCase();
+  let tbody = document.querySelector('.items-table tbody');
+  let rows = tbody.getElementsByTagName('tr');
+
+  for (let i = 0; i < rows.length; i++) {
+    // Skip the "No transfers found" row if it exists
+    if (rows[i].cells.length === 1) continue; 
+    
+    let dateCell = rows[i].cells[1];
+    let fromCell = rows[i].cells[2];
+    let toCell = rows[i].cells[3];
+    let notesCell = rows[i].cells[4];
+    
+    if (dateCell || fromCell || toCell || notesCell) {
+      let dateText = dateCell.textContent || dateCell.innerText;
+      let fromText = fromCell.textContent || fromCell.innerText;
+      let toText = toCell.textContent || toCell.innerText;
+      let notesText = notesCell.textContent || notesCell.innerText;
+      
+      if (dateText.toLowerCase().indexOf(filter) > -1 || 
+          fromText.toLowerCase().indexOf(filter) > -1 || 
+          toText.toLowerCase().indexOf(filter) > -1 ||
+          notesText.toLowerCase().indexOf(filter) > -1) {
+        rows[i].style.display = "";
+      } else {
+        rows[i].style.display = "none";
+      }
+    }
+  }
+}
+</script>
+{% endblock %}

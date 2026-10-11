@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Projects{% endblock %}
+{% block page_title %}Project Accounting{% endblock %}
+{% block content %}
+
+<div class="card mb-0">
+  <div class="card-header">
+    <div class="card-title">All Projects</div>
+    <button class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('open')">+ New Project</button>
+  </div>
+  {% if projects %}
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>#</th><th>Project Name</th><th>Client</th><th>Budget</th><th>Status</th><th>Created</th><th class="text-center">Action</th></tr></thead>
+      <tbody>
+        {% for p in projects %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><strong>{{ p['name'] }}</strong><br><small>{{ p['description'][:50] + '...' if p['description'] else '' }}</small></td>
+          <td>{{ p['client_name'] or '—' }}</td>
+          <td>₹{{ "{:,.2f}".format(p['budget']) }}</td>
+          <td><span class="badge badge-{{ 'success' if p['status'] == 'Active' else 'muted' }}">{{ p['status'] }}</span></td>
+          <td>{{ p['created_at'][:10] }}</td>
+          <td class="text-center">
+            <a href="{{ url_for('project_details', project_id=p['id']) }}" class="btn btn-outline btn-sm">Manage</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="empty-icon">📊</div><p>No projects added yet.</p></div>
+  {% endif %}
+</div>
+
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-title">Create New Project</div>
+    <form method="POST" action="{{ url_for('add_project') }}">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Project Name *</label>
+          <input type="text" name="name" required placeholder="E.g. Website Development">
+        </div>
+        <div class="form-group">
+          <label>Client Name</label>
+          <input type="text" name="client_name" placeholder="Client or Company">
+        </div>
+        <div class="form-group">
+          <label>Budget (₹)</label>
+          <input type="number" name="budget" value="0" step="any">
+        </div>
+        <div class="form-group full">
+          <label>Description</label>
+          <textarea name="description" placeholder="Project scope or notes"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Project</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block title %}Record Income{% endblock %}
+{% block page_title %}Record Income{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 0 auto;">
+  <form method="POST" action="{% if income %}{{ url_for('edit_income', inc_id=income['id']) }}{% else %}{{ url_for('new_income') }}{% endif %}">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" name="inc_date" value="{{ income['inc_date'] if income else today }}" required>
+      </div>
+      
+      <div class="form-group">
+        <label>Category</label>
+        <select name="category" required>
+          <option {% if income and income['category'] == 'Job / Salary' %}selected{% endif %}>Job / Salary</option>
+          <option {% if income and income['category'] == 'Freelance / Consulting' %}selected{% endif %}>Freelance / Consulting</option>
+          <option {% if income and income['category'] == 'Interest Income' %}selected{% endif %}>Interest Income</option>
+          <option {% if income and income['category'] == 'Rental Income' %}selected{% endif %}>Rental Income</option>
+          <option {% if income and income['category'] == 'Other Income' %}selected{% endif %}>Other Income</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="grid-column: 1 / -1;">
+        <label>Payer / Source (Optional)</label>
+        <input type="text" name="payer" value="{{ income['payer'] if income else '' }}" placeholder="Where did this income come from?">
+      </div>
+
+      <div class="form-group">
+        <label>Amount (₹)</label>
+        <input type="number" name="amount" min="0" step="any" required value="{{ income['amount'] if income else '' }}" placeholder="0.00">
+      </div>
+
+      <div class="form-group" style="grid-column: 1 / -1;">
+        <label>Description</label>
+        <input type="text" name="description" value="{{ income['description'] if income else '' }}" placeholder="Brief detail about the income">
+      </div>
+
+      <div class="form-group">
+        <label>Status</label>
+        <select name="status" id="statusSelect" required>
+          <option value="Received" {% if income and income['status'] == 'Received' %}selected{% endif %}>Received</option>
+          <option value="Expected" {% if income and income['status'] == 'Expected' %}selected{% endif %}>Expected</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="paymentModeDiv">
+        <label>Payment Mode</label>
+        <select name="payment_mode" onchange="toggleBankSource(this, 'incomeBankSourceDiv')">
+          <option value="Cash" {% if income and income['payment_mode'] == 'Cash' %}selected{% endif %}>Cash</option>
+          <option value="Bank" {% if income and income['payment_mode'] and income['payment_mode'].startswith('Bank') %}selected{% endif %}>Bank</option>
+        </select>
+      </div>
+      
+      <div class="form-group" id="incomeBankSourceDiv" style="display: none;">
+        <label>Bank Source</label>
+        <select name="bank_source">
+          <option value="Cheque" {% if income and income['payment_mode'] and 'Cheque' in income['payment_mode'] %}selected{% endif %}>Cheque</option>
+          <option value="Bank Transfer" {% if income and income['payment_mode'] and 'Bank Transfer' in income['payment_mode'] %}selected{% endif %}>Bank Transfer</option>
+          <option value="UPI" {% if income and income['payment_mode'] and 'UPI' in income['payment_mode'] %}selected{% endif %}>UPI</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Hidden input to redirect back to dashboard if submitted from there -->
+    <input type="hidden" name="from_dashboard" value="{{ request.args.get('from_dashboard', '') }}">
+
+    <div style="margin-top: 24px; display: flex; gap: 10px;">
+      <button type="submit" class="btn btn-primary" style="flex: 1;">💾 Save Income</button>
+      <a href="javascript:history.back()" class="btn btn-outline" style="flex: 1; text-align: center;">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+function togglePaymentMode() {
+  const status = document.getElementById('statusSelect').value;
+  const modeDiv = document.getElementById('paymentModeDiv');
+  if (status === 'Expected') {
+    modeDiv.style.display = 'none';
+  } else {
+    modeDiv.style.display = 'block';
+  }
+}
+document.getElementById('statusSelect').addEventListener('change', togglePaymentMode);
+
+function initBankSource() {
+  const select = document.querySelector('select[name="payment_mode"]');
+  const div = document.getElementById('incomeBankSourceDiv');
+  if (select && select.value === 'Bank') {
+    div.style.display = 'block';
+  }
+}
+
+// Run on load
+document.addEventListener('DOMContentLoaded', function() {
+  togglePaymentMode();
+  initBankSource();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Software Activation Required</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<style>
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: #0f172a;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: white;
+  }
+  .lock-card {
+    background: white;
+    color: #333;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    width: 100%;
+    max-width: 450px;
+    text-align: center;
+  }
+  .lock-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+  }
+  .lock-title {
+    font-size: 24px;
+    font-weight: bold;
+    color: #dc2626;
+    margin-bottom: 10px;
+  }
+  .lock-desc {
+    font-size: 15px;
+    color: #64748b;
+    margin-bottom: 30px;
+    line-height: 1.5;
+  }
+  .activation-form input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 16px;
+    text-align: center;
+    margin-bottom: 20px;
+    font-family: monospace;
+    font-weight: bold;
+    letter-spacing: 2px;
+  }
+  .activation-form input:focus {
+    border-color: #0f172a;
+    outline: none;
+  }
+  .activation-form button {
+    width: 100%;
+    padding: 14px;
+    background: #0f172a;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  .activation-form button:hover {
+    background: #1e293b;
+  }
+  .alert {
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    font-weight: bold;
+  }
+  .alert-error { background: #fee2e2; color: #b91c1c; }
+</style>
+</head>
+<body>
+
+<div class="lock-card">
+  <div class="lock-icon">🔒</div>
+  <div class="lock-title">7-Day Trial Expired</div>
+  <div class="lock-desc">
+    Your trial period of 7 days has ended ({{ days_passed }} days passed).<br>
+    Please contact <strong>SK CloudEdge</strong> to purchase the full version and receive your Activation Key.
+  </div>
+
+  <div style="background: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 25px; border: 1px dashed #94a3b8;">
+    <div style="font-size: 13px; color: #475569; text-transform: uppercase; font-weight: bold; margin-bottom: 5px;">Your Installation ID</div>
+    <div style="font-size: 24px; font-family: monospace; font-weight: bold; color: #0f172a; letter-spacing: 2px;">{{ install_id }}</div>
+  </div>
+
+
+    <div style="font-size: 14px; color: #334155; margin-bottom: 25px; line-height: 1.6;">
+    Send the Installation ID above via WhatsApp or Email to get your Activation Key:<br>
+    <strong>WhatsApp:</strong> 8983098901<br>
+    <strong>Email:</strong> skcloudedge@gmail.com
+  </div>
+      <div style="font-size: 28px; font-weight: bold; color: #16a34a;">₹1,499</div>
+    </div>
+    
+    <div style="font-size: 14px; color: #334155; line-height: 1.6; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+      <strong>How to Pay & Activate:</strong>
+      <ol style="margin-top: 8px; margin-bottom: 0; padding-left: 20px;">
+        <li>Pay <strong>₹1,499</strong> via UPI to <strong>8983098901</strong>.</li>
+        <li>Send a screenshot of payment + your <strong>Installation ID</strong> via WhatsApp or Email.</li>
+        <li>You will receive your <strong>Activation Key</strong> instantly!</li>
+      </ol>
+    </div>
+  </div>
+
+  
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <form method="POST" class="activation-form">
+    <input type="text" name="activation_key" placeholder="ENTER ACTIVATION KEY" required autocomplete="off">
+    <button type="submit">Unlock Full Version</button>
+  </form>
+</div>
+
+</body>
+</html>

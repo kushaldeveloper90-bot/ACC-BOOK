@@ -1,0 +1,279 @@
+{% extends 'base.html' %}
+{% block title %}Ledger{% endblock %}
+{% block page_title %}Ledger / Accounts{% endblock %}
+{% block content %}
+<style>
+  .client-ledger-header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      padding: 24px 32px;
+      border-radius: 4px;
+      margin-bottom: 24px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+  }
+  .client-ledger-header::after {
+      content: '🧾';
+      position: absolute;
+      right: -20px;
+      top: -20px;
+      font-size: 120px;
+      opacity: 0.05;
+      transform: rotate(-15deg);
+  }
+  .client-name-title {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      color: #fff;
+  }
+  .client-date-range {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.7);
+  }
+  .premium-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+  }
+  .premium-table th {
+      background: var(--table-th-bg);
+      color: var(--muted);
+      padding: 16px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 2px solid var(--border);
+      border-top: 1px solid var(--border);
+  }
+  .premium-table td {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+  }
+  .premium-table tbody tr:hover td {
+      background-color: var(--hover-bg);
+  }
+  .total-row td {
+      background: var(--table-th-bg) !important;
+      font-weight: 700;
+      font-size: 15px;
+      border-top: 2px solid var(--border);
+  }
+  .closing-balance-row td {
+      background: rgba(56, 189, 248, 0.1) !important;
+      font-weight: 800;
+      font-size: 16px;
+      color: var(--accent);
+  }
+  .amount-debit { color: var(--text); font-weight: 600; font-family: monospace; font-size: 14px; }
+  .amount-credit { color: var(--success); font-weight: 600; font-family: monospace; font-size: 14px; }
+  .modern-filter {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 16px 24px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+      margin-bottom: 24px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-end;
+  }
+</style>
+
+{% set selected_party_name = '' %}
+{% set selected_party_type = '' %}
+{% if party_id %}
+  {% for p in parties %}
+    {% if p['id']|string == party_id %}
+      {% set selected_party_name = p['name'] %}
+      {% set selected_party_type = p['type'] %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+<div class="modern-filter">
+  <form method="GET" style="display:flex; gap:16px; width:100%; align-items:flex-end; flex-wrap:wrap;">
+    <div class="form-group" style="flex:1; min-width:250px;">
+      <label style="font-size:11px; color:var(--muted);">Select Client / Party</label>
+      <div style="display:flex; gap:8px;">
+        <div style="position:relative; flex:1;">
+          <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none;">🔍</span>
+          <input type="text" name="party_name" id="partyName" list="partyList" autocomplete="off" oninput="matchPartyId()" value="{{ selected_party_name }}" placeholder="Search {% if ledger_type == 'supplier' %}Suppliers{% else %}Customers{% endif %}..." style="width:100%; border:1px solid var(--border); border-radius:8px; padding:10px 10px 10px 36px; background:var(--bg); color:var(--text);">
+        </div>
+        <datalist id="partyList">
+          {% for p in parties %}
+          <option data-id="{{ p['id'] }}" value="{{ p['name'] }}"></option>
+          {% endfor %}
+        </datalist>
+        <input type="hidden" name="party_id" id="partyId" value="{{ party_id or '' }}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label style="font-size:11px; color:var(--muted);">From Date</label>
+      <input type="date" name="from_date" value="{{ from_date }}" style="border:1px solid var(--border); border-radius:8px; padding:10px; background:var(--bg); color:var(--text);">
+    </div>
+    <div class="form-group">
+      <label style="font-size:11px; color:var(--muted);">To Date</label>
+      <input type="date" name="to_date" value="{{ to_date }}" style="border:1px solid var(--border); border-radius:8px; padding:10px; background:var(--bg); color:var(--text);">
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button type="submit" class="btn btn-primary" style="padding:10px 20px; border-radius:8px;">Show Report</button>
+      <a href="{% if ledger_type == 'supplier' %}{{ url_for('supplier_ledger') }}{% else %}{{ url_for('ledger') }}{% endif %}" class="btn btn-outline" style="padding:10px 20px; border-radius:8px;">Reset</a>
+    </div>
+  </form>
+</div>
+
+{% if request.args %}
+{% if selected_party_name %}
+<div class="client-ledger-header">
+  <div>
+    <div class="client-name-title">{{ selected_party_name }}</div>
+    <div class="client-date-range">
+      {% if ledger_type == 'supplier' %}SUPPLIER LEDGER{% else %}CUSTOMER LEDGER{% endif %} &nbsp;|&nbsp; 
+      {% if from_date and to_date %}
+        {{ from_date|format_date }} to {{ to_date|format_date }}
+      {% elif from_date %}
+        From {{ from_date|format_date }}
+      {% elif to_date %}
+        Until {{ to_date|format_date }}
+      {% else %}
+        All Time Transactions
+      {% endif %}
+    </div>
+  </div>
+  <div style="text-align:right;">
+    <div style="font-size:12px; color:#94a3b8; text-transform:uppercase; margin-bottom:4px;">Closing Balance</div>
+    <div style="font-size:28px; font-weight:800; color:#fff;">₹{{ "{:,.2f}".format(balance|abs) }} {% if balance>0 %}(Dr){% elif balance<0 %}(Cr){% endif %}</div>
+  </div>
+</div>
+{% else %}
+<div class="three-col" style="margin-bottom:24px;">
+  <div class="stat-card" style="border-left:4px solid var(--primary); background:var(--card); padding:16px;">
+    <div><div class="stat-value">₹{{ "{:,.2f}".format(total_debit) }}</div><div class="stat-label">{% if ledger_type == 'supplier' %}Total Payments Made{% else %}Total Bills (Sales){% endif %}</div></div>
+  </div>
+  <div class="stat-card" style="border-left:4px solid var(--success); background:var(--card); padding:16px;">
+    <div><div class="stat-value">₹{{ "{:,.2f}".format(total_credit) }}</div><div class="stat-label">{% if ledger_type == 'supplier' %}Total Purchase Bills{% else %}Total Receipts (Paid){% endif %}</div></div>
+  </div>
+  <div class="stat-card" style="border-left:4px solid var(--accent); background:var(--card); padding:16px;">
+    <div>
+      <div class="stat-value" style="color:var(--accent);">₹{{ "{:,.2f}".format(balance|abs) }}</div>
+      <div class="stat-label">{% if ledger_type == 'supplier' %}Amount Owed (To Pay){% else %}Amount Due (To Receive){% endif %}</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card" style="padding:0; overflow:hidden; border:none; box-shadow:0 4px 15px rgba(0,0,0,0.05);">
+  {% if entries %}
+  <div class="table-wrapper">
+    <table class="premium-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Invoice / Ref No</th>
+          {% if not selected_party_name %}<th>Party Name</th>{% endif %}
+          <th>Remark / Description</th>
+          {% if ledger_type == 'supplier' %}
+          <th style="text-align:right;">Payment Made (Dr)</th>
+          <th style="text-align:right;">Purchase Bill (Cr)</th>
+          {% else %}
+          <th style="text-align:right;">Sales Bill (Dr)</th>
+          <th style="text-align:right;">Receipt (Cr)</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+        <tr>
+          <td style="color:var(--muted); font-weight:500;">{{ e['entry_date']|format_date }}</td>
+          <td>
+            {% if e['ref_type']=='invoice' %}<span style="background:var(--table-th-bg); padding:4px 8px; border-radius:4px; font-family:monospace; font-weight:bold; font-size:12px; border:1px solid var(--border);">{{ e['ref_no'] }}</span>
+            {% else %}<span style="color:var(--muted);">—</span>{% endif %}
+          </td>
+          {% if not selected_party_name %}
+            <td style="font-weight:600;">{{ e['party_name'] or '—' }}</td>
+          {% endif %}
+          <td>{{ e['description'] or '—' }}</td>
+          <td align="right">
+            {% if e['debit']>0 %}<span class="amount-debit">{{ "{:,.2f}".format(e['debit']) }}</span>{% else %}<span style="color:var(--muted);">—</span>{% endif %}
+          </td>
+          <td align="right">
+            {% if e['credit']>0 %}<span class="amount-credit">{{ "{:,.2f}".format(e['credit']) }}</span>{% else %}<span style="color:var(--muted);">—</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        <!-- Totals row -->
+        <tr class="total-row">
+          <td colspan="{% if not selected_party_name %}4{% else %}3{% endif %}" align="right" style="text-transform:uppercase; letter-spacing:1px;">Total :</td>
+          <td align="right">{{ "{:,.2f}".format(total_debit) }}</td>
+          <td align="right">{{ "{:,.2f}".format(total_credit) }}</td>
+        </tr>
+        {% if selected_party_name %}
+        <tr class="closing-balance-row">
+          <td colspan="4" align="right" style="text-transform:uppercase; letter-spacing:1px;">Total Closing Balance :</td>
+          <td align="right">₹{{ "{:,.2f}".format(balance|abs) }} {% if balance>0 %}(Dr){% elif balance<0 %}(Cr){% endif %}</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state" style="padding:60px 20px;">
+    <div class="empty-icon" style="font-size:64px; color:#cbd5e1;">📊</div>
+    <p style="font-size:16px; color:#64748b; margin-top:16px;">No transactions found for this period.</p>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openPartyModal() {
+  document.getElementById('partySearchInput').value = '';
+  filterParties();
+  document.getElementById('partySearchModal').classList.add('open');
+  document.getElementById('partySearchInput').focus();
+}
+
+function filterParties() {
+  let filter = document.getElementById('partySearchInput').value.toLowerCase();
+  let rows = document.querySelectorAll('.party-row');
+  rows.forEach(row => {
+    let text = row.querySelector('.party-name').innerText.toLowerCase();
+    row.style.display = text.includes(filter) ? '' : 'none';
+  });
+}
+
+function selectParty(id, name) {
+  document.getElementById('partyId').value = id;
+  document.getElementById('partyName').value = name;
+  document.getElementById('partySearchModal').classList.remove('open');
+}
+
+function clearParty() {
+  document.getElementById('partyId').value = '';
+  document.getElementById('partyName').value = '';
+}
+
+function matchPartyId() {
+  const val = document.getElementById('partyName').value;
+  const list = document.getElementById('partyList').options;
+  let foundId = '';
+  for(let i=0; i<list.length; i++) {
+    if(list[i].value === val) {
+      foundId = list[i].getAttribute('data-id');
+      break;
+    }
+  }
+  document.getElementById('partyId').value = foundId;
+}
+</script>
+{% endblock %}

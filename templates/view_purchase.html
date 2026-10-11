@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block title %}Purchase Bill {{ purchase['bill_no'] }}{% endblock %}
+{% block page_title %}Purchase Bill {{ purchase['bill_no'] }}{% endblock %}
+{% block content %}
+
+<div style="max-width:720px;margin:0 auto;">
+<div class="card" id="printArea">
+  <!-- Header -->
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid var(--primary); padding-bottom:16px; margin-bottom:20px;">
+    <div>
+      {% if comp and comp['logo_filename'] %}
+      <img src="{{ url_for('uploaded_file', filename=comp['logo_filename']) }}" alt="Logo" style="max-height:80px; margin-bottom:10px;">
+      {% endif %}
+      <div style="font-size:20px; font-weight:800; color:var(--primary);">{{ comp['name'] if comp else 'My Company' }}</div>
+      <div style="font-size:12px; color:var(--muted); white-space:pre-wrap;">{{ comp['address'] if comp else '' }}</div>
+      <div style="font-size:12px; color:var(--muted);">Phone: {{ comp['phone'] if comp else '' }} | GSTIN: {{ comp['gstin'] if comp else '' }}</div>
+      <div style="font-size:12px; color:var(--muted);">State: {{ comp['state'] if comp else '' }}</div>
+    </div>
+    <div style="text-align:right;">
+      <h2 style="color:var(--primary); font-size:28px; margin-bottom:4px; letter-spacing:1px;">PURCHASE BILL</h2>
+      <div><strong>Bill No:</strong> {{ purchase['bill_no'] }}</div>
+      <div><strong>Date:</strong> {{ purchase['bill_date']|format_date }}</div>
+      <div style="margin-top:6px;"><span class="badge" style="background:#e0e7ff; color:#3730a3;">{{ purchase['category'] }}</span></div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:24px;">
+    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;margin-bottom:6px;">Supplier / Vendor Details</div>
+    <div style="font-size:16px;font-weight:700;">{{ purchase['party_name'] }}</div>
+    {% if party %}
+      <div style="font-size:12px; color:#475569; margin-top:2px; white-space:pre-wrap;">{{ party['address'] or '' }}</div>
+      <div style="font-size:12px; color:#475569; margin-top:2px;">Phone: {{ party['phone'] or 'N/A' }} | GSTIN: {{ party['gstin'] or 'N/A' }}</div>
+    {% endif %}
+  </div>
+
+  <div class="table-wrapper" style="margin-bottom:20px;">
+    <table>
+      <thead><tr><th>#</th><th>Description</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ item['description'] }}</td>
+          <td class="text-center">{{ item['qty'] }}</td>
+          <td class="text-right">₹{{ "{:,.2f}".format(item['rate']) }}</td>
+          <td class="text-right fw-bold">₹{{ "{:,.2f}".format(item['amount']) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div style="display:flex;justify-content:flex-end;">
+    <div class="summary-box" style="min-width:280px;">
+      <div class="summary-row"><span>Subtotal</span><span>₹{{ "{:,.2f}".format(purchase['amount']) }}</span></div>
+      
+      {% if purchase['discount_pct'] and purchase['discount_pct'] > 0 %}
+      <div class="summary-row" style="color:#dc2626;"><span>Discount ({{ purchase['discount_pct'] }}%)</span><span>- ₹{{ "{:,.2f}".format(purchase['discount_amount']) }}</span></div>
+      {% endif %}
+      
+      {% if purchase['cgst_pct'] and purchase['cgst_pct'] > 0 %}
+      <div class="summary-row"><span>CGST @ {{ purchase['cgst_pct'] }}%</span><span>₹{{ "{:,.2f}".format(purchase['cgst_amount']) }}</span></div>
+      <div class="summary-row"><span>SGST @ {{ purchase['sgst_pct'] }}%</span><span>₹{{ "{:,.2f}".format(purchase['sgst_amount']) }}</span></div>
+      {% elif purchase['igst_pct'] and purchase['igst_pct'] > 0 %}
+      <div class="summary-row"><span>IGST @ {{ purchase['igst_pct'] }}%</span><span>₹{{ "{:,.2f}".format(purchase['igst_amount']) }}</span></div>
+      {% elif purchase['tax_amount'] and purchase['tax_amount'] > 0 and not purchase['cgst_pct'] %}
+      <!-- Legacy fallback for old purchases -->
+      <div class="summary-row"><span>GST</span><span>₹{{ "{:,.2f}".format(purchase['tax_amount']) }}</span></div>
+      {% endif %}
+      
+      <div class="summary-row total"><span>GRAND TOTAL</span><span>₹{{ "{:,.2f}".format(purchase['total']) }}</span></div>
+    </div>
+  </div>
+
+  {% if purchase['notes'] %}
+  <div style="margin-top:16px;font-size:12px;color:var(--muted);">Notes: {{ purchase['notes'] }}</div>
+  {% endif %}
+  
+  <div style="margin-top:40px; display:flex; justify-content:space-between; align-items:flex-end;">
+    <div style="font-size:12px; color:var(--muted);">* Internal record of purchase.</div>
+    <div style="text-align:center;">
+      <div style="border-bottom:1px solid #000; width:150px; margin-bottom:6px;"></div>
+      <div style="font-size:11px; font-weight:600;">Authorized Signatory</div>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;gap:10px;justify-content:flex-end;">
+  <button onclick="exportToPDF('printArea', 'Purchase-Bill-{{ purchase['bill_no'] }}.pdf')" class="btn btn-primary" style="background:#dc2626; border-color:#dc2626;">📥 Export PDF</button>
+  <button onclick="window.print()" class="btn btn-outline">🖨️ Print</button>
+  <a href="{{ url_for('purchases') }}" class="btn btn-primary">← Back</a>
+</div>
+</div>
+
+<style>
+@media print {
+  .sidebar, .topbar, .alert, .btn, form { display: none !important; }
+  .main-content { margin-left: 0 !important; }
+  .content-area { padding: 0 !important; }
+}
+</style>
+{% endblock %}

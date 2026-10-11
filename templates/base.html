@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Accounting Software{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ range(1, 999999) | random }}">
+<script>
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+</script>
+</head>
+<body>
+{% if current_user.is_authenticated %}
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">₹</div>
+      <div>
+        <div class="brand-name">AccBook</div>
+        <div class="brand-sub">Accounting Software</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint=='dashboard' %}active{% endif %}">
+        <span class="nav-icon">⊞</span> Dashboard
+      </a>
+      <div class="nav-section">MAIN MENU</div>
+      <a href="{{ url_for('accounts_hub') }}" class="nav-item {% if request.endpoint in ['accounts_hub', 'invoices', 'new_invoice', 'view_invoice', 'receipts', 'purchases', 'new_purchase', 'payments', 'gst'] %}active{% endif %}">
+        <span class="nav-icon">💼</span> Accounts
+      </a>
+      <div class="nav-section">OTHER INCOMES & EXPENSES</div>
+      <a href="{{ url_for('incomes_expenses_hub') }}" class="nav-item {% if request.endpoint in ['incomes_expenses_hub', 'incomes', 'new_income', 'expenses', 'new_expense', 'edit_expense', 'other_expenses', 'new_other_expense'] %}active{% endif %}">
+        <span class="nav-icon">💵</span> Incomes & Expenses
+      </a>
+      <div class="nav-section">REPORTS</div>
+      {% if active_modules.get('financials', True) %}
+      <a href="{{ url_for('reports_hub') }}" class="nav-item {% if request.endpoint in ['reports_hub', 'ledger', 'supplier_ledger', 'financials', 'cash_book', 'bank_book'] %}active{% endif %}">
+        <span class="nav-icon">📑</span> Reports
+      </a>
+      {% endif %}
+      <div class="nav-section">INVENTORY & CRM</div>
+      {% if active_modules.get('parties', True) %}
+      <a href="{{ url_for('parties') }}" class="nav-item {% if request.endpoint=='parties' %}active{% endif %}">
+        <span class="nav-icon">👥</span> Parties
+      </a>
+      {% endif %}
+      {% if active_modules.get('products', True) %}
+      <a href="{{ url_for('products') }}" class="nav-item {% if request.endpoint=='products' %}active{% endif %}">
+        <span class="nav-icon">📦</span> Products / Items
+      </a>
+      {% endif %}
+      {% if current_user.role == 'admin' %}
+      <div class="nav-section">ADMIN</div>
+      <a href="{{ url_for('company') }}" class="nav-item {% if request.endpoint=='company' %}active{% endif %}">
+        <span class="nav-icon">🏢</span> Company Profile
+      </a>
+      <a href="{{ url_for('users') }}" class="nav-item {% if request.endpoint=='users' %}active{% endif %}">
+        <span class="nav-icon">👤</span> Users
+      </a>
+      <a href="{{ url_for('audit_logs') }}" class="nav-item {% if request.endpoint=='audit_logs' %}active{% endif %}">
+        <span class="nav-icon">🛡️</span> Audit Trail
+      </a>
+      <a href="{{ url_for('modules_manager') }}" class="nav-item {% if request.endpoint=='modules_manager' %}active{% endif %}">
+        <span class="nav-icon">⚙️</span> Modules
+      </a>
+      {% endif %}
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar">{{ current_user.full_name[0] if current_user.full_name else 'U' }}</div>
+        <div>
+          <div class="user-name">{{ current_user.full_name or current_user.username }}</div>
+          <div class="user-role">{{ current_user.role|title }}</div>
+        </div>
+      </div>
+      <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+      <div style="margin-top:15px; text-align:center; font-size:10px; color:rgba(255,255,255,0.4); line-height:1.4;">
+        &copy; 2026 SK CloudEdge<br>All Rights Reserved.
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content">
+    <div class="topbar">
+      <div style="display:flex; align-items:center; gap:16px;"><button id="mobileMenuBtn" style="display:none; background:none; border:none; font-size:20px; cursor:pointer; color:var(--text);">&#9776;</button>
+        <a href="javascript:history.back()" title="Go Back" style="text-decoration:none; color:var(--text); font-size:18px; font-weight:bold; display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; background:var(--card); border:1px solid var(--border); transition:all 0.2s; box-shadow:0 1px 2px rgba(0,0,0,0.05);">←</a>
+        <div class="page-title">{% block page_title %}{% endblock %}</div>
+      </div>
+      <div class="topbar-right" style="display: flex; align-items: center; gap: 15px;">
+          {% if session.get('company_name') %}
+          <div style="display: flex; align-items: center; gap: 10px; background: var(--bg); padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);">
+            <span style="font-size: 12px; font-weight: 600; color: var(--primary);">🏢 {{ session.get('company_name') }}</span>
+            {% if active_modules.get('multiple_company', True) %}<a href="{{ url_for('select_company') }}" style="font-size: 11px; color: var(--muted); text-decoration: none; padding: 2px 6px; background: var(--card); border: 1px solid var(--border); border-radius: 4px; transition: 0.2s;">Switch</a>{% endif %}
+          </div>
+          {% endif %}
+        <button id="themeToggle" style="background: var(--bg); border: 1px solid var(--border); border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; color: var(--text);" title="Toggle Theme">
+          <span id="themeIcon">🌙</span>
+        </button>
+        <span class="date-display" id="liveClock"></span>
+      </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="content-area">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
+{% else %}
+  {% block auth_content %}{% endblock %}
+{% endif %}
+
+<script>
+function updateClock() {
+  const el = document.getElementById('liveClock');
+  if (el) el.textContent = new Date().toLocaleString('en-IN', {dateStyle:'medium', timeStyle:'short'});
+}
+updateClock(); setInterval(updateClock, 60000);
+
+const themeToggle = document.getElementById('themeToggle');
+const themeIcon = document.getElementById('themeIcon');
+if (themeToggle) {
+  const currentTheme = document.documentElement.getAttribute('data-theme');
+  themeIcon.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+
+  themeToggle.addEventListener('click', () => {
+    let theme = document.documentElement.getAttribute('data-theme');
+    let newTheme = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    themeIcon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+  });
+}
+function toggleBankSource(selectEl, sourceDivId) {
+  var div = document.getElementById(sourceDivId);
+  if (div) {
+    if (selectEl.value === 'Bank' || selectEl.value.startsWith('Bank')) {
+      div.style.display = 'block';
+    } else {
+      div.style.display = 'none';
+    }
+  }
+}
+function filterTable(inputId, tableId) {
+  let input = document.getElementById(inputId);
+  if (!input) return;
+  let filter = input.value.toLowerCase();
+  let tbody = document.querySelector('#' + tableId + ' tbody');
+  if(!tbody) return;
+  let tr = tbody.getElementsByTagName('tr');
+  for (let i = 0; i < tr.length; i++) {
+    let text = tr[i].textContent || tr[i].innerText;
+    tr[i].style.display = text.toLowerCase().indexOf(filter) > -1 ? '' : 'none';
+  }
+}
+
+function exportToPDF(elementId, filename) {
+  var element = document.getElementById(elementId);
+  if (!element) return;
+  var opt = {
+    margin:       [0.3, 0.3, 0.3, 0.3],
+    filename:     filename,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
+    jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
+    pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+  };
+  
+  html2pdf().set(opt).from(element).outputPdf('datauristring').then(function(pdfAsString) {
+    fetch('/save_pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: filename, pdf_data: pdfAsString })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if(data.status === 'success') {
+        // Success silently or alert
+      } else if (data.status === 'cancelled') {
+        // Do nothing
+      } else {
+        alert("Error saving PDF: " + data.msg);
+      }
+    })
+    .catch(err => {
+      alert("Network error while saving PDF.");
+    });
+  });
+}
+</script>
+<script src="{{ url_for('static', filename='js/html2pdf.bundle.min.js') }}"></script>
+{% block scripts %}{% endblock %}
+<script>document.getElementById("mobileMenuBtn")?.addEventListener("click", function() { document.querySelector(".sidebar").classList.toggle("show-sidebar"); });</script></body>
+</html>

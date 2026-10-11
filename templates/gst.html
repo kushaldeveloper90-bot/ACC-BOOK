@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+{% block title %}GST Reports{% endblock %}
+{% block page_title %}GST Reports{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+  <a href="{{ url_for('accounts_hub') }}" class="btn btn-outline" style="padding: 6px 12px; font-size: 14px;">← Back to Accounts</a>
+</div>
+
+<style>
+  .gst-tabs {
+    display: flex; gap: 10px; margin-bottom: 20px;
+    border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;
+  }
+  .gst-tab {
+    padding: 10px 20px; font-weight: 600; cursor: pointer; border-radius: 8px;
+    background: var(--bg); color: var(--muted); transition: all 0.2s;
+  }
+  .gst-tab.active {
+    background: #3b82f6; color: white;
+  }
+  .gst-panel { display: none; }
+  .gst-panel.active { display: block; }
+  
+  .gst-summary-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;
+  }
+  .gst-box { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); text-align: center; }
+  .gst-box .val { font-size: 24px; font-weight: 800; color: var(--text); margin-top: 8px; }
+</style>
+
+<form method="GET" action="{{ url_for('gst') }}" style="margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; background: var(--card); padding: 15px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+  <div>
+    <label style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px; color: var(--muted);">From Date</label>
+    <input type="date" name="from_date" class="form-control" value="{{ from_date }}" style="padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; outline: none; transition: border-color 0.2s; background: var(--bg); color: var(--text);">
+  </div>
+  <div>
+    <label style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px; color: var(--muted);">To Date</label>
+    <input type="date" name="to_date" class="form-control" value="{{ to_date }}" style="padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; outline: none; transition: border-color 0.2s; background: var(--bg); color: var(--text);">
+  </div>
+  <div>
+    <button type="submit" class="btn" style="background: #3b82f6; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-weight: 500; cursor: pointer; transition: background 0.2s;">Filter Reports</button>
+  </div>
+  <div style="margin-left: auto; display: flex; gap: 10px;">
+    <button type="submit" name="export" value="excel" class="btn" style="background: #10b981; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-weight: 500; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 8px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+        <path d="M5.884 6.68a.5.5 0 1 0-.768.64L7.349 10l-2.233 2.68a.5.5 0 0 0 .768.64L8 10.781l2.116 2.54a.5.5 0 0 0 .768-.641L8.651 10l2.233-2.68a.5.5 0 0 0-.768-.64L8 9.219l-2.116-2.54z"/>
+        <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5v2z"/>
+      </svg>
+      Export Excel
+    </button>
+    <button type="submit" name="export" value="json" class="btn" style="background: #f59e0b; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-weight: 500; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 8px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+        <path d="M2.5 0A1.5 1.5 0 0 0 1 1.5v13A1.5 1.5 0 0 0 2.5 16h11a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 13.5 0h-11zM14 1.5v13a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-13a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 .5.5z"/>
+        <path d="M5 4h6v1H5zm0 3h6v1H5zm0 3h6v1H5z"/>
+      </svg>
+      GSTN JSON
+    </button>
+    <input type="hidden" name="active_tab" id="activeTabInput" value="{{ active_tab }}">
+  </div>
+</form>
+
+<div class="gst-tabs">
+  <div class="gst-tab {% if active_tab == 'gstr1' %}active{% endif %}" onclick="switchTab('gstr1')">GSTR-1 (Outward / Sales)</div>
+  <div class="gst-tab {% if active_tab == 'gstr2' %}active{% endif %}" onclick="switchTab('gstr2')">GSTR-2 (Inward / Purchase)</div>
+  <div class="gst-tab {% if active_tab == 'gstr3b' %}active{% endif %}" onclick="switchTab('gstr3b')">GSTR-3B (Summary)</div>
+</div>
+
+<!-- GSTR 1 PANEL -->
+<div id="gstr1" class="gst-panel {% if active_tab == 'gstr1' %}active{% endif %}">
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div class="card-header"><div class="card-title">GSTR-1: Outward Supplies</div></div>
+    <div class="table-wrapper">
+      <table class="items-table" style="width: 100%;">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Invoice No</th>
+            <th>Customer Name</th>
+            <th style="text-align:right;">Taxable Value</th>
+            <th style="text-align:right;">CGST</th>
+            <th style="text-align:right;">SGST</th>
+            <th style="text-align:right;">IGST</th>
+            <th style="text-align:right;">Total Invoice Val</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in sales %}
+          <tr>
+            <td>{{ s['invoice_date']|format_date }}</td>
+            <td>{{ s['invoice_no'] }}</td>
+            <td>{{ s['party_name'] }}</td>
+            <td align="right">₹{{ "{:,.2f}".format(s['subtotal']) }}</td>
+            <td align="right">₹{{ "{:,.2f}".format(s['cgst_amount'] or 0) }}</td>
+            <td align="right">₹{{ "{:,.2f}".format(s['sgst_amount'] or 0) }}</td>
+            <td align="right">₹{{ "{:,.2f}".format(s['igst_amount'] or 0) }}</td>
+            <td align="right" style="font-weight:bold;">₹{{ "{:,.2f}".format(s['total']) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- GSTR 2 PANEL -->
+<div id="gstr2" class="gst-panel {% if active_tab == 'gstr2' %}active{% endif %}">
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div class="card-header"><div class="card-title">GSTR-2: Inward Supplies</div></div>
+    <div class="table-wrapper">
+      <table class="items-table" style="width: 100%;">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Bill No</th>
+            <th>Supplier Name</th>
+            <th style="text-align:right;">Taxable Value</th>
+            <th style="text-align:right;">CGST Paid</th>
+            <th style="text-align:right;">SGST Paid</th>
+            <th style="text-align:right;">IGST Paid</th>
+            <th style="text-align:right;">Total Bill Val</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in purchases %}
+          <tr>
+            <td>{{ p['bill_date']|format_date }}</td>
+            <td>{{ p['bill_no'] }}</td>
+            <td>{{ p['party_name'] }}</td>
+            <td align="right">₹{{ "{:,.2f}".format(p['amount']) }}</td>
+            <td align="right">₹{{ "{:,.2f}".format(p['cgst_amount'] or 0) }}</td>
+            <td align="right">₹{{ "{:,.2f}".format(p['sgst_amount'] or 0) }}</td>
+            <td align="right">₹{{ "{:,.2f}".format(p['igst_amount'] or 0) }}</td>
+            <td align="right" style="font-weight:bold;">₹{{ "{:,.2f}".format(p['total']) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- GSTR 3B PANEL -->
+<div id="gstr3b" class="gst-panel {% if active_tab == 'gstr3b' %}active{% endif %}">
+  <div class="gst-summary-grid">
+    <div class="gst-box" style="border-top: 4px solid #3b82f6;">
+      <div style="color: #64748b; font-size: 14px;">Total Taxable Sales</div>
+      <div class="val">₹{{ "{:,.2f}".format(total_sales_val) }}</div>
+    </div>
+    <div class="gst-box" style="border-top: 4px solid #10b981;">
+      <div style="color: #64748b; font-size: 14px;">Total Taxable Purchases</div>
+      <div class="val">₹{{ "{:,.2f}".format(total_purchase_val) }}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:15px;">Tax Liability vs ITC (Input Tax Credit)</div>
+    <table class="items-table" style="width:100%;">
+      <thead>
+        <tr>
+          <th>Tax Type</th>
+          <th style="text-align:right;">Output Tax (Collected on Sales)</th>
+          <th style="text-align:right;">Input Tax Credit (Paid on Purchases)</th>
+          <th style="text-align:right;">Net Tax Payable / (Refundable)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-weight:bold;">CGST</td>
+          <td align="right">₹{{ "{:,.2f}".format(sales_cgst) }}</td>
+          <td align="right">₹{{ "{:,.2f}".format(purchase_cgst) }}</td>
+          <td align="right" style="font-weight:bold; color: {{ 'red' if net_cgst > 0 else 'green' }}">
+            ₹{{ "{:,.2f}".format(net_cgst) }}
+          </td>
+        </tr>
+        <tr>
+          <td style="font-weight:bold;">SGST</td>
+          <td align="right">₹{{ "{:,.2f}".format(sales_sgst) }}</td>
+          <td align="right">₹{{ "{:,.2f}".format(purchase_sgst) }}</td>
+          <td align="right" style="font-weight:bold; color: {{ 'red' if net_sgst > 0 else 'green' }}">
+            ₹{{ "{:,.2f}".format(net_sgst) }}
+          </td>
+        </tr>
+        <tr>
+          <td style="font-weight:bold;">IGST</td>
+          <td align="right">₹{{ "{:,.2f}".format(sales_igst) }}</td>
+          <td align="right">₹{{ "{:,.2f}".format(purchase_igst) }}</td>
+          <td align="right" style="font-weight:bold; color: {{ 'red' if net_igst > 0 else 'green' }}">
+            ₹{{ "{:,.2f}".format(net_igst) }}
+          </td>
+        </tr>
+        <tr style="background: var(--table-th-bg);">
+          <td style="font-weight:900;">TOTAL NET LIABILITY</td>
+          <td align="right" style="font-weight:bold;">₹{{ "{:,.2f}".format(sales_cgst + sales_sgst + sales_igst) }}</td>
+          <td align="right" style="font-weight:bold;">₹{{ "{:,.2f}".format(purchase_cgst + purchase_sgst + purchase_igst) }}</td>
+          {% set net = net_cgst + net_sgst + net_igst %}
+          <td align="right" style="font-weight:900; font-size: 16px; color: {{ 'red' if net > 0 else 'green' }}">
+            ₹{{ "{:,.2f}".format(net) }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top: 10px; font-size: 13px; color: #64748b;">
+      * Green indicates excess Input Tax Credit (ITC). Red indicates Tax Payable to the government.
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(tabId) {
+  document.querySelectorAll('.gst-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.gst-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  document.querySelector(`.gst-tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+  document.getElementById('activeTabInput').value = tabId;
+}
+</script>
+{% endblock %}

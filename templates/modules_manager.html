@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Module Manager{% endblock %}
+{% block page_title %}Feature Modules{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 0 auto;">
+  <div class="card-header">
+    <div class="card-title" style="color: var(--primary);">System Modules</div>
+    <div style="font-size: 14px; color: var(--muted); margin-top: 5px;">
+      Enable or disable specific features for this client's license. Disabled modules will instantly disappear from their dashboard and sidebar navigation.
+    </div>
+  </div>
+
+  {% if unlocked %}
+  <form method="POST" action="{{ url_for('modules_manager') }}">
+    <div class="table-wrapper" style="margin-top: 20px;">
+      <table class="items-table" style="width: 100%;">
+        <thead>
+          <tr>
+            <th>Module Name</th>
+            <th style="text-align: right;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for mod in all_mods %}
+          <tr>
+            <td style="text-transform: capitalize; font-weight: 500; font-size: 15px;">
+              <label for="mod_{{ mod['id'] }}" style="cursor: pointer; display: block;">
+                {{ mod['module_name'] }}
+              </label>
+            </td>
+            <td style="text-align: right;">
+              <input type="checkbox" id="mod_{{ mod['id'] }}" name="modules" value="{{ mod['module_name'] }}" 
+                style="width: 20px; height: 20px; cursor: pointer;"
+                {% if mod['is_active'] %}checked{% endif %}>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top: 20px; text-align: right;">
+      <button type="submit" class="btn btn-primary" style="padding: 10px 30px; font-size: 16px;">Save License Configuration</button>
+    </div>
+  </form>
+  {% else %}
+  <div style="padding: 30px 20px; text-align: center;">
+    <div style="font-size: 40px; margin-bottom: 15px;">🔒</div>
+    <h3 style="margin-bottom: 15px; color: var(--text);">Developer Access Required</h3>
+    <p style="color: var(--muted); margin-bottom: 25px; font-size: 14px;">Please enter the Master Developer Password to manage the license configuration for this installation.</p>
+    
+    <form method="POST" action="{{ url_for('modules_manager') }}" style="max-width: 300px; margin: 0 auto;">
+      <div class="form-group">
+        <input type="password" name="master_password" class="form-control" placeholder="Master Password" required style="text-align: center;">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Unlock Manager</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

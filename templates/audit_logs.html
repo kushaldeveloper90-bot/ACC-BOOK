@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}Audit Trail{% endblock %}
+{% block page_title %}Audit Trail{% endblock %}
+
+{% block content %}
+<div class="card mb-0">
+  <div class="card-header">
+    <div class="card-title">System Audit Logs</div>
+  </div>
+  {% if logs %}
+  <div class="table-wrapper">
+    <table style="font-size: 13px;">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>User</th>
+          <th>Action</th>
+          <th>Table</th>
+          <th>Record ID</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td style="white-space: nowrap;">{{ log['timestamp'] }}</td>
+          <td><strong>{{ log['username'] }}</strong></td>
+          <td>
+            <span class="badge badge-{{ 'success' if log['action'] == 'INSERT' else 'primary' if log['action'] == 'UPDATE' else 'danger' }}">
+              {{ log['action'] }}
+            </span>
+          </td>
+          <td>{{ log['table_name'] }}</td>
+          <td>#{{ log['record_id'] }}</td>
+          <td>
+            <button class="btn btn-outline btn-sm" onclick="viewAuditDetails({{ log['id'] }})">View Changes</button>
+            <div id="audit-data-{{ log['id'] }}" style="display: none;">
+              <div class="old-values">{{ log['old_values'] or '{}' }}</div>
+              <div class="new-values">{{ log['new_values'] or '{}' }}</div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">🛡️</div>
+    <p>No audit logs available yet.</p>
+  </div>
+  {% endif %}
+</div>
+
+<div class="modal-overlay" id="auditDetailModal">
+  <div class="modal" style="max-width: 600px;">
+    <div class="modal-title">Audit Log Details</div>
+    <div id="auditDetailsContent" style="font-family: monospace; font-size: 13px; background: var(--bg); padding: 15px; border-radius: 4px; overflow-x: auto;">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="document.getElementById('auditDetailModal').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function formatJsonStr(str) {
+  try {
+    return JSON.stringify(JSON.parse(str), null, 2);
+  } catch (e) {
+    return str;
+  }
+}
+
+function viewAuditDetails(logId) {
+  const oldVal = document.querySelector('#audit-data-' + logId + ' .old-values').textContent;
+  const newVal = document.querySelector('#audit-data-' + logId + ' .new-values').textContent;
+  
+  let html = '';
+  if (oldVal !== '{}') {
+    html += '<strong style="color: #dc2626;">Previous Values:</strong><pre style="margin-top: 5px; margin-bottom: 15px; white-space: pre-wrap;">' + formatJsonStr(oldVal) + '</pre>';
+  }
+  if (newVal !== '{}') {
+    html += '<strong style="color: #059669;">New Values:</strong><pre style="margin-top: 5px; white-space: pre-wrap;">' + formatJsonStr(newVal) + '</pre>';
+  }
+  
+  document.getElementById('auditDetailsContent').innerHTML = html;
+  document.getElementById('auditDetailModal').classList.add('open');
+}
+</script>
+{% endblock %}

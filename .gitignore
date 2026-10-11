@@ -1,0 +1,36 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller builds & executables
+build/
+dist/
+*.spec
+
+# Database & Local instance data
+instance/
+*.db
+
+# Backups
+*_backup/
+{templates,static/
+
+# Logs
+*.log
+
+# Temp & testing scripts
+desktop.py
+keygen.py
+fix_colors.ps1
+temp*.py
+test*.py
+fix*.py
+check_*.py
+split_*.py
+physically_*.py
+truncate*.py
+
+# OS files
+.DS_Store
+Thumbs.db

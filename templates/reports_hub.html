@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports Hub{% endblock %}
+
+{% block content %}
+<style>
+  .modern-hub-container {
+    padding: 20px 0;
+  }
+  
+  .hub-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  
+  .hub-header h2 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .hub-header p {
+    color: var(--muted);
+    font-size: 14px;
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  .modern-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  .glass-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 30px 20px;
+    text-align: center;
+    text-decoration: none;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  }
+
+  .glass-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    border-color: var(--primary);
+  }
+
+  .icon-wrapper {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 20px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    background: var(--bg);
+    color: var(--primary);
+    border: 1px solid var(--border);
+  }
+
+  .glass-card.customer { border-top: 4px solid #3b82f6; }
+  .glass-card.customer .icon-wrapper { background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2); }
+
+  .glass-card.supplier { border-top: 4px solid #ef4444; }
+  .glass-card.supplier .icon-wrapper { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); }
+
+  .glass-card.financials { border-top: 4px solid #8b5cf6; }
+  .glass-card.financials .icon-wrapper { background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.2); }
+
+  .glass-card.cash { border-top: 4px solid #10b981; }
+  .glass-card.cash .icon-wrapper { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); }
+
+  .glass-card.bank { border-top: 4px solid #0ea5e9; }
+  .glass-card.bank .icon-wrapper { background: rgba(14, 165, 233, 0.1); border-color: rgba(14, 165, 233, 0.2); }
+
+  .card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .card-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+</style>
+
+<div class="modern-hub-container">
+  <div class="hub-header">
+    <h2>Reporting Center</h2>
+    <p>Access your ledgers, cash/bank books, and comprehensive financial statements all from one unified dashboard.</p>
+  </div>
+
+  <div class="modern-grid">
+    <!-- Customer Ledger -->
+    <a href="{{ url_for('ledger') }}" class="glass-card customer">
+      <div class="icon-wrapper">📘</div>
+      <div class="card-title">Customer Ledger</div>
+      <div class="card-desc">Track and manage individual customer accounts and outstanding balances.</div>
+    </a>
+
+    <!-- Supplier Ledger -->
+    <a href="{{ url_for('supplier_ledger') }}" class="glass-card supplier">
+      <div class="icon-wrapper">📙</div>
+      <div class="card-title">Supplier Ledger</div>
+      <div class="card-desc">Monitor payables, bills, and purchase history for all your vendors.</div>
+    </a>
+
+    <!-- Financial Statements -->
+    <a href="{{ url_for('financials') }}" class="glass-card financials">
+      <div class="icon-wrapper">📊</div>
+      <div class="card-title">Financial Statements</div>
+      <div class="card-desc">Generate Profit & Loss, Trial Balance, and full Balance Sheets.</div>
+    </a>
+
+    <!-- Cash Book -->
+    <a href="{{ url_for('cash_book') }}" class="glass-card cash">
+      <div class="icon-wrapper">💵</div>
+      <div class="card-title">Cash Book</div>
+      <div class="card-desc">View all cash transactions, receipts, payments, and current cash-in-hand.</div>
+    </a>
+
+    <!-- Bank Book -->
+    <a href="{{ url_for('bank_book') }}" class="glass-card bank">
+      <div class="icon-wrapper">🏦</div>
+      <div class="card-title">Bank Book</div>
+      <div class="card-desc">Track online transactions, bank transfers, and current bank balances.</div>
+    </a>
+
+    <!-- Cash-Bank Transfer -->
+    <a href="{{ url_for('transfer') }}" class="glass-card transfer" style="border-top: 4px solid #f59e0b;">
+      <div class="icon-wrapper" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">🔄</div>
+      <div class="card-title" style="color: #d97706;">Cash-Bank Transfer</div>
+      <div class="card-desc">Transfer funds securely between Cash and Bank accounts.</div>
+    </a>
+  </div>
+</div>
+{% endblock %}

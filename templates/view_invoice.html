@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% block title %}Invoice {{ invoice['invoice_no'] }}{% endblock %}
+{% block page_title %}Invoice {{ invoice['invoice_no'] }}{% endblock %}
+{% block content %}
+
+<div style="max-width:720px;margin:0 auto;">
+<div class="card" id="printArea" style="border: none; overflow-x: hidden;">
+  <!-- Header -->
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:20px; border-bottom:2px solid var(--primary); padding-bottom:16px; margin-bottom:20px;">
+    <div>
+      {% if comp and comp['logo_filename'] %}
+      <img src="{{ url_for('uploaded_file', filename=comp['logo_filename']) }}" alt="Logo" style="max-height:80px; margin-bottom:10px;">
+      {% endif %}
+      <div style="font-size:20px; font-weight:800; color:var(--primary);">{{ comp['name'] if comp else 'My Company' }}</div>
+      <div style="font-size:12px; color:var(--muted); white-space:pre-wrap;">{{ comp['address'] if comp else '' }}</div>
+      <div style="font-size:12px; color:var(--muted);">Phone: {{ comp['phone'] if comp else '' }} | GSTIN: {{ comp['gstin'] if comp else '' }}</div>
+      <div style="font-size:12px; color:var(--muted);">State: {{ comp['state'] if comp else '' }}</div>
+    </div>
+    <div style="text-align:right;">
+      <h2 style="color:var(--primary); font-size:28px; margin-bottom:4px; letter-spacing:1px;">INVOICE</h2>
+      <div><strong>Invoice No:</strong> {{ invoice['invoice_no'] }}</div>
+      <div><strong>Date:</strong> {{ invoice['invoice_date']|format_date }}</div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:24px;">
+    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;margin-bottom:6px;">Bill To (Customer Details)</div>
+    <div style="font-size:16px;font-weight:700;">{{ invoice['party_name'] }}</div>
+    {% if party %}
+      <div style="font-size:12px; color:#475569; margin-top:2px; white-space:pre-wrap;">{{ party['address'] or '' }}</div>
+      <div style="font-size:12px; color:#475569; margin-top:2px;">Phone: {{ party['phone'] or 'N/A' }} | GSTIN: {{ party['gstin'] or 'N/A' }}</div>
+    {% endif %}
+  </div>
+
+  <div class="table-wrapper" style="margin-bottom:20px;">
+    <table>
+      <thead><tr><th>#</th><th>Description</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ item['description'] }}</td>
+          <td class="text-center">{{ item['qty'] }}</td>
+          <td class="text-right">₹{{ "{:,.2f}".format(item['rate']) }}</td>
+          <td class="text-right fw-bold">₹{{ "{:,.2f}".format(item['amount']) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div style="display:flex;justify-content:flex-end;">
+    <div class="summary-box" style="min-width:280px;">
+      <div class="summary-row"><span>Subtotal</span><span>₹{{ "{:,.2f}".format(invoice['subtotal']) }}</span></div>
+      
+      {% if invoice['discount_pct'] and invoice['discount_pct'] > 0 %}
+      <div class="summary-row" style="color:#dc2626;"><span>Discount ({{ invoice['discount_pct'] }}%)</span><span>- ₹{{ "{:,.2f}".format(invoice['discount_amount']) }}</span></div>
+      {% endif %}
+      
+      {% if invoice['cgst_pct'] and invoice['cgst_pct'] > 0 %}
+      <div class="summary-row"><span>CGST @ {{ invoice['cgst_pct'] }}%</span><span>₹{{ "{:,.2f}".format(invoice['cgst_amount']) }}</span></div>
+      <div class="summary-row"><span>SGST @ {{ invoice['sgst_pct'] }}%</span><span>₹{{ "{:,.2f}".format(invoice['sgst_amount']) }}</span></div>
+      {% elif invoice['igst_pct'] and invoice['igst_pct'] > 0 %}
+      <div class="summary-row"><span>IGST @ {{ invoice['igst_pct'] }}%</span><span>₹{{ "{:,.2f}".format(invoice['igst_amount']) }}</span></div>
+      {% elif invoice['tax_amount'] and invoice['tax_amount'] > 0 and not invoice['cgst_pct'] %}
+      <!-- Legacy fallback for old invoices -->
+      <div class="summary-row"><span>GST</span><span>₹{{ "{:,.2f}".format(invoice['tax_amount']) }}</span></div>
+      {% endif %}
+      
+      <div class="summary-row total"><span>GRAND TOTAL</span><span>₹{{ "{:,.2f}".format(invoice['total']) }}</span></div>
+    </div>
+  </div>
+
+  {% if invoice['notes'] %}
+  <div style="margin-top:16px;font-size:12px;color:var(--muted);">Notes: {{ invoice['notes'] }}</div>
+  {% endif %}
+
+  {% if comp and comp['bank_details'] %}
+  <div style="margin-top:24px; padding-top:16px; border-top:1px solid #e2e8f0; font-size:12px; page-break-inside: avoid;">
+    <div style="font-weight:700; margin-bottom:4px;">Bank Details:</div>
+    <div style="white-space:pre-wrap; color:var(--muted);">{{ comp['bank_details'] }}</div>
+  </div>
+  {% endif %}
+  
+  <div style="margin-top:40px; display:flex; justify-content:space-between; align-items:flex-end;">
+    <div style="font-size:12px; color:var(--muted);">* This is a computer generated invoice.</div>
+    <div style="text-align:center;">
+      <div style="border-bottom:1px solid #000; width:150px; margin-bottom:6px;"></div>
+      <div style="font-size:11px; font-weight:600;">Authorized Signatory</div>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;gap:10px;justify-content:flex-end;margin-bottom: 20px;">
+  <button onclick="sendWhatsApp(event)" class="btn btn-primary" style="background:#25D366; border-color:#25D366; color:white;">💬 WhatsApp</button>
+  <button onclick="exportToPDF('printArea', 'Invoice-{{ invoice['invoice_no'] }}.pdf')" class="btn btn-primary" style="background:#dc2626; border-color:#dc2626;">📥 Export PDF</button>
+  <button onclick="window.print()" class="btn btn-outline">🖨️ Print</button>
+  {% if invoice['status'] == 'unpaid' %}
+  <form method="POST" action="{{ url_for('mark_paid', inv_id=invoice['id']) }}">
+    <button class="btn btn-success">✓ Mark as Paid</button>
+  </form>
+  {% endif %}
+  <a href="{{ url_for('invoices') }}" class="btn btn-primary">← Back</a>
+</div>
+</div>
+
+<script>
+function sendWhatsApp(event) {
+  const invoiceNo = "{{ invoice['invoice_no']|escape }}";
+  const date = "{{ invoice['invoice_date']|format_date|escape }}";
+  const amount = "{{ '{:,.2f}'.format(invoice['total'])|escape }}";
+  const partyName = "{{ invoice['party_name']|escape }}";
+  const phoneRaw = "{{ party['phone'] if party and party['phone'] else '' }}";
+  
+  let text = `Hello ${partyName},\n\nHere is your invoice ${invoiceNo} for ₹${amount}. I have just copied the PDF file to my computer's clipboard! When this chat opens, please wait a second while I paste and send the PDF.\n\nThank you!`;
+  const encodedText = encodeURIComponent(text);
+  
+  let cleanPhone = phoneRaw.replace(/\D/g, '');
+  if (cleanPhone.length === 10) {
+      cleanPhone = "91" + cleanPhone; 
+  }
+  
+  const url = cleanPhone ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}` : `https://api.whatsapp.com/send?text=${encodedText}`;
+  
+  var element = document.getElementById('printArea');
+  var filename = 'Invoice-' + invoiceNo + '.pdf';
+  var opt = {
+    margin:       [0.3, 0.3, 0.3, 0.3],
+    filename:     filename,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
+    jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+  };
+  
+  const btn = event.currentTarget;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '⏳ Preparing PDF...';
+  btn.disabled = true;
+
+  html2pdf().set(opt).from(element).outputPdf('datauristring').then(function(pdfAsString) {
+    fetch('/whatsapp_pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: filename, pdf_data: pdfAsString })
+    })
+    .then(res => res.json())
+    .then(data => {
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+      if(data.status === 'success') {
+        window.open(url, '_blank');
+      } else {
+        alert("Error preparing PDF for WhatsApp: " + data.msg);
+      }
+    })
+    .catch(err => {
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+      alert("Error generating PDF: " + err);
+    });
+  });
+}
+</script>
+
+<style>
+@media print {
+  .sidebar, .topbar, .alert, .btn, form { display: none !important; }
+  .main-content { margin-left: 0 !important; }
+  .content-area { padding: 0 !important; }
+}
+</style>
+{% endblock %}

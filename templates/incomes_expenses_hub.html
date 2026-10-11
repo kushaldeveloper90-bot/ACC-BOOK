@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block title %}Incomes & Expenses{% endblock %}
+{% block page_title %}Incomes & Expenses Hub{% endblock %}
+
+{% block content %}
+<style>
+  .modern-hub-container {
+    padding: 20px 0;
+  }
+  
+  .hub-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  
+  .hub-header h2 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .hub-header p {
+    color: var(--muted);
+    font-size: 14px;
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  .modern-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    max-width: 800px; /* smaller max-width since only two cards */
+    margin: 0 auto;
+  }
+
+  .glass-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 30px 20px;
+    text-align: center;
+    text-decoration: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: all 0.2s;
+  }
+
+  .glass-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    border-color: var(--primary);
+  }
+
+  .icon-wrapper {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    background: var(--bg);
+    color: var(--primary);
+    border: 1px solid var(--border);
+  }
+
+  .glass-card.incomes { border-top: 3px solid #10b981; }
+  .glass-card.incomes .icon-wrapper { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: #10b981; }
+
+  .glass-card.expenses { border-top: 3px solid #d97706; }
+  .glass-card.expenses .icon-wrapper { background: rgba(217, 119, 6, 0.1); border-color: rgba(217, 119, 6, 0.2); }
+
+  .card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .card-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+</style>
+
+<div class="modern-hub-container">
+  <div class="hub-header">
+    <h2>Other Incomes & Expenses</h2>
+    <p>Manage your miscellaneous incomes and track your operational office expenses.</p>
+  </div>
+
+  <div class="modern-grid">
+    <a href="{{ url_for('incomes') }}" class="glass-card incomes">
+      <div class="icon-wrapper">💵</div>
+      <div class="card-title">Other Incomes</div>
+      <div class="card-desc">Record miscellaneous incomes like job salary, freelancing, interest, etc.</div>
+    </a>
+
+    <a href="{{ url_for('other_expenses') }}" class="glass-card expenses">
+      <div class="icon-wrapper">📈</div>
+      <div class="card-title">Other Expenses</div>
+      <div class="card-desc">Track non-office related miscellaneous outgoing money.</div>
+    </a>
+  </div>
+</div>
+{% endblock %}

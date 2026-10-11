@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block auth_content %}
+<div class="login-page">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="logo-icon">₹</div>
+      <h2>AccBook</h2>
+      <p>Accounting Software</p>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    <form method="POST">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" name="username" required autofocus placeholder="Enter username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" required placeholder="Enter password">
+      </div>
+      <button type="submit" class="login-btn">Sign In</button>
+    </form>
+    <div class="login-hint">Default: <strong>admin</strong> / <strong>admin123</strong></div>
+    <div style="margin-top:20px; text-align:center; font-size:11px; color:var(--muted);">
+      &copy; 2026 SK CloudEdge. All Rights Reserved.<br>
+      <span style="font-size:9px; opacity:0.7;">Authorized Licensees Only</span>
+    </div>
+  </div>
+</div>
+{% endblock %}

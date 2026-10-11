@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+{% block title %}Project Details{% endblock %}
+{% block page_title %}{{ project['name'] }}{% endblock %}
+{% block content %}
+
+<style>
+  .metric-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 20px;
+    border-radius: 4px;
+    text-align: center;
+  }
+  .metric-title { font-size: 13px; color: var(--muted); text-transform: uppercase; margin-bottom: 8px;}
+  .metric-val { font-size: 24px; font-weight: 700; color: var(--text); }
+  .metric-val.profit { color: #059669; }
+  .metric-val.loss { color: #dc2626; }
+</style>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+  <h3 style="margin: 0; color: var(--text);">Project Overview</h3>
+  <div style="display: flex; gap: 10px;">
+    <button class="btn btn-outline btn-sm" onclick="document.getElementById('editProjectModal').classList.add('open')">✏️ Edit Project</button>
+    <form method="POST" action="{{ url_for('delete_project', project_id=project['id']) }}" onsubmit="return confirm('Are you sure you want to completely delete this project? All timesheets will be deleted and invoices/expenses unlinked.');" style="margin: 0;">
+      <button type="submit" class="btn btn-primary btn-sm" style="background: #dc2626; border-color: #dc2626;">🗑️ Delete</button>
+    </form>
+  </div>
+</div>
+
+<div class="form-grid mb-4">
+  <div class="metric-card">
+    <div class="metric-title">Budget</div>
+    <div class="metric-val">₹{{ "{:,.2f}".format(project['budget']) }}</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-title">Total Invoiced</div>
+    <div class="metric-val">₹{{ "{:,.2f}".format(total_invoiced) }}</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-title">Costs (Time + Exp)</div>
+    <div class="metric-val">₹{{ "{:,.2f}".format(total_timesheet_cost + total_expenses) }}</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-title">Profitability</div>
+    <div class="metric-val {% if profitability >= 0 %}profit{% else %}loss{% endif %}">₹{{ "{:,.2f}".format(profitability) }}</div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">
+    <div class="card-title">Timesheets / Logs</div>
+    <button class="btn btn-primary btn-sm" onclick="document.getElementById('addTimeModal').classList.add('open')">+ Add Time</button>
+  </div>
+  {% if timesheets %}
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>Date</th><th>Employee</th><th>Task</th><th>Duration</th><th>Rate</th><th>Cost</th></tr></thead>
+      <tbody>
+        {% for t in timesheets %}
+        <tr>
+          <td>{{ t['task_date']|format_date }}</td>
+          <td>{{ t['employee_name'] }}</td>
+          <td>{{ t['task_description'] or '—' }}</td>
+          <td>{{ t['hours'] }} {{ 'days' if t['rate_type'] == 'Daily' else 'hrs' }}</td>
+          <td>₹{{ "{:,.2f}".format(t['hourly_rate']) }}<small>{{ '/day' if t['rate_type'] == 'Daily' else '/hr' }}</small></td>
+          <td>₹{{ "{:,.2f}".format(t['hours'] * t['hourly_rate']) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="padding: 15px; color: var(--muted);">No timesheets logged.</div>
+  {% endif %}
+</div>
+
+<div class="form-grid">
+  <div class="card mb-0">
+    <div class="card-header">
+      <div class="card-title">Project Invoices</div>
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('linkInvoiceModal').classList.add('open')">Link Invoice</button>
+    </div>
+    {% if invoices %}
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>Date</th><th>Inv #</th><th>Amount</th></tr></thead>
+        <tbody>
+          {% for i in invoices %}
+          <tr>
+            <td>{{ i['invoice_date']|format_date }}</td>
+            <td><a href="{{ url_for('view_invoice', inv_id=i['id']) }}">{{ i['invoice_no'] }}</a></td>
+            <td>₹{{ "{:,.2f}".format(i['total']) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding: 15px; color: var(--muted);">No invoices linked. <br><small>Click "Link Invoice" to add one.</small></div>
+    {% endif %}
+  </div>
+
+  <div class="card mb-0">
+    <div class="card-header">
+      <div class="card-title">Project Expenses</div>
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('linkExpenseModal').classList.add('open')">Link Expense</button>
+    </div>
+    {% if expenses %}
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>Date</th><th>Category</th><th>Amount</th></tr></thead>
+        <tbody>
+          {% for e in expenses %}
+          <tr>
+            <td>{{ e['exp_date']|format_date }}</td>
+            <td>{{ e['category'] }}<br><small>{{ e['payee'] }}</small></td>
+            <td>₹{{ "{:,.2f}".format(e['amount']) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding: 15px; color: var(--muted);">No expenses linked. <br><small>Click "Link Expense" to add one.</small></div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="modal-overlay" id="addTimeModal">
+  <div class="modal">
+    <div class="modal-title">Log Timesheet</div>
+    <form method="POST" action="{{ url_for('add_timesheet') }}">
+      <input type="hidden" name="project_id" value="{{ project['id'] }}">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Employee Name *</label>
+          <input type="text" name="employee_name" required value="{{ current_user.full_name if current_user.is_authenticated else '' }}">
+        </div>
+        <div class="form-group full">
+          <label>Rate Type *</label>
+          <select name="rate_type" id="rateTypeSelect" onchange="toggleRateLabels()">
+            <option value="Hourly">Hourly</option>
+            <option value="Daily">Daily</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Date *</label>
+          <input type="date" name="task_date" required>
+        </div>
+        <div class="form-group">
+          <label id="lblDuration">Hours Worked *</label>
+          <input type="number" name="hours" step="0.5" required min="0.5">
+        </div>
+        <div class="form-group">
+          <label id="lblRate">Hourly Cost Rate (₹) *</label>
+          <input type="number" name="hourly_rate" step="any" required title="Internal cost per unit for profitability">
+        </div>
+        <div class="form-group full">
+          <label>Task Description</label>
+          <textarea name="task_description" placeholder="What was worked on?"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('addTimeModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Timesheet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="linkInvoiceModal">
+  <div class="modal" style="max-width: 400px;">
+    <div class="modal-title">Link Invoice</div>
+    <form method="POST" action="{{ url_for('link_project_invoice', project_id=project['id']) }}">
+      <div class="form-group full">
+        <label>Invoice Number *</label>
+        <input type="text" name="invoice_no" required placeholder="E.g. INV-0001">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('linkInvoiceModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Link</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="linkExpenseModal">
+  <div class="modal" style="max-width: 400px;">
+    <div class="modal-title">Link Expense</div>
+    <form method="POST" action="{{ url_for('link_project_expense', project_id=project['id']) }}">
+      <div class="form-group full">
+        <label>Expense Ref No or ID *</label>
+        <input type="text" name="expense_ref" required placeholder="E.g. EXP-0001 or ID">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('linkExpenseModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Link</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editProjectModal">
+  <div class="modal">
+    <div class="modal-title">Edit Project</div>
+    <form method="POST" action="{{ url_for('edit_project', project_id=project['id']) }}">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Project Name *</label>
+          <input type="text" name="name" required value="{{ project['name'] }}">
+        </div>
+        <div class="form-group">
+          <label>Client Name</label>
+          <input type="text" name="client_name" value="{{ project['client_name'] }}">
+        </div>
+        <div class="form-group">
+          <label>Budget (₹)</label>
+          <input type="number" name="budget" step="any" value="{{ project['budget'] }}">
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select name="status">
+            <option value="Active" {% if project['status'] == 'Active' %}selected{% endif %}>Active</option>
+            <option value="Completed" {% if project['status'] == 'Completed' %}selected{% endif %}>Completed</option>
+            <option value="On Hold" {% if project['status'] == 'On Hold' %}selected{% endif %}>On Hold</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label>Description</label>
+          <textarea name="description">{{ project['description'] }}</textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('editProjectModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  document.querySelector('input[name="task_date"]').valueAsDate = new Date();
+  
+  function toggleRateLabels() {
+    const rateType = document.getElementById('rateTypeSelect').value;
+    const lblDuration = document.getElementById('lblDuration');
+    const lblRate = document.getElementById('lblRate');
+    
+    if(rateType === 'Daily') {
+      lblDuration.textContent = 'Days Worked *';
+      lblRate.textContent = 'Daily Cost Rate (₹) *';
+    } else {
+      lblDuration.textContent = 'Hours Worked *';
+      lblRate.textContent = 'Hourly Cost Rate (₹) *';
+    }
+  }
+</script>
+{% endblock %}

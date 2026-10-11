@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}Edit {{ 'Receipt' if receipt['type'] == 'receipt' else 'Payment' }}{% endblock %}
+{% block page_title %}Edit {{ 'Receipt' if receipt['type'] == 'receipt' else 'Payment' }}{% endblock %}
+{% block content %}
+
+<div style="max-width:600px; margin:0 auto;">
+<div class="card">
+  <div class="card-title">Edit Details</div>
+  <form method="POST">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Date *</label>
+        <input type="date" name="receipt_date" required value="{{ receipt['receipt_date'] }}">
+      </div>
+      <div class="form-group">
+        <label>Amount (₹) *</label>
+        <input type="number" name="amount" min="0" step="any" required value="{{ receipt['amount'] }}">
+      </div>
+      <div class="form-group">
+        <label>Party Name</label>
+        <input type="text" name="party_name" value="{{ receipt['party_name'] }}" required>
+      </div>
+      <div class="form-group">
+        <label>Select Party (Optional)</label>
+        <select name="party_id" onchange="this.previousElementSibling.previousElementSibling.querySelector('input').value=this.options[this.selectedIndex].text||''">
+          <option value="">-- Optional --</option>
+          {% for p in parties %}
+          <option value="{{ p['id'] }}" {% if receipt['party_id'] == p['id'] %}selected{% endif %}>{{ p['name'] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Payment Mode</label>
+        <select name="payment_mode" onchange="toggleBankSource(this, 'editReceiptBankSourceDiv')">
+          {% set mode = receipt['payment_mode'] %}
+          {% set is_bank = mode.startswith('Bank') %}
+          <option value="Cash" {% if not is_bank %}selected{% endif %}>Cash</option>
+          <option value="Bank" {% if is_bank %}selected{% endif %}>Bank</option>
+        </select>
+      </div>
+      <div class="form-group" id="editReceiptBankSourceDiv" style="display: {% if is_bank %}block{% else %}none{% endif %};">
+        <label>Bank Source</label>
+        <select name="bank_source">
+          {% set bs = mode.split(' - ')[1] if is_bank and ' - ' in mode else '' %}
+          <option value="Cheque" {% if bs == 'Cheque' %}selected{% endif %}>Cheque</option>
+          <option value="Bank Transfer" {% if bs == 'Bank Transfer' %}selected{% endif %}>Bank Transfer</option>
+          <option value="UPI" {% if bs == 'UPI' %}selected{% endif %}>UPI</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Reference No.</label>
+        <input type="text" name="reference_no" value="{{ receipt['reference_no'] }}">
+      </div>
+      <div class="form-group full">
+        <label>Notes</label>
+        <textarea name="notes">{{ receipt['notes'] }}</textarea>
+      </div>
+    </div>
+    <div style="margin-top:20px; display:flex; gap:10px;">
+      <button type="submit" class="btn btn-primary" style="flex:1;">💾 Save Changes</button>
+      <a href="{{ url_for('invoices') if receipt['type'] == 'receipt' else url_for('purchases') }}" class="btn btn-outline" style="flex:1; text-align:center;">Cancel</a>
+    </div>
+  </form>
+</div>
+</div>
+
+{% endblock %}

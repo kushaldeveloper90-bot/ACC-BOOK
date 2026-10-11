@@ -1,0 +1,354 @@
+{% extends 'base.html' %}
+{% block title %}New Invoice{% endblock %}
+{% block page_title %}New Invoice{% endblock %}
+{% block content %}
+
+<form method="POST" id="invoiceForm">
+<div class="invoice-grid">
+
+  <!-- Left: Invoice Details -->
+    <div class="card invoice-details">
+      <div class="card-title" style="margin-bottom:16px;">Invoice Details</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Invoice No.</label>
+          <input type="text" name="invoice_no" value="{{ invoice.invoice_no if invoice else next_no }}" required>
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" name="invoice_date" value="{{ invoice.invoice_date if invoice else today }}" required>
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Party</label>
+          <div style="display:flex; gap:10px;">
+            <input type="text" name="party_name" id="partyName" value="{{ invoice.party_name if invoice else '' }}" readonly required placeholder="No party selected" style="flex:1; background:var(--hover-bg);">
+            <input type="hidden" name="party_id" id="partyId" value="{{ invoice.party_id if invoice else '' }}">
+            <button type="button" class="btn btn-outline" onclick="openPartyModal()" style="white-space: nowrap;">🔍 Search Party</button>
+          </div>
+        </div>
+        </div>
+</div>
+<div class="card invoice-items">
+    <div class="card-header">
+      <div class="card-title">Items</div>
+      <button type="button" class="btn btn-success btn-sm" onclick="addRow()">+ Add Row</button>
+    </div>
+    <div class="table-wrapper">
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th style="width:40%">Description</th>
+            <th style="width:15%">Qty</th>
+            <th style="width:20%">Rate (₹)</th>
+            <th style="width:20%">Amount (₹)</th>
+            <th style="width:5%"></th>
+          </tr>
+        </thead>
+        <tbody id="itemsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+<div class="card invoice-taxes">
+<div class="card-title" style="margin-bottom:16px;">Taxes & Extras</div>
+<div class="form-grid">
+<div class="form-group">
+          <label>Discount %</label>
+          <input type="number" name="discount_pct" id="discountPct" min="0" max="100" step="any" value="{{ invoice.discount_pct if invoice else 0 }}" oninput="recalc()">
+        </div>
+        <div class="form-group" style="display:flex; gap:10px;">
+          <div style="flex:1;">
+            <label>CGST %</label>
+            <input type="number" name="cgst_pct" id="cgstPct" min="0" step="any" value="{{ invoice.cgst_pct if invoice else 0 }}" oninput="handleGst('cgst')">
+          </div>
+          <div style="flex:1;">
+            <label>SGST %</label>
+            <input type="number" name="sgst_pct" id="sgstPct" min="0" step="any" value="{{ invoice.sgst_pct if invoice else 0 }}" readonly style="background:var(--hover-bg);">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>IGST %</label>
+          <input type="number" name="igst_pct" id="igstPct" min="0" step="any" value="{{ invoice.igst_pct if invoice else 0 }}" oninput="handleGst('igst')">
+        </div>
+        <div class="form-group">
+          <label>Place of Supply (State Code)</label>
+          <input type="text" name="place_of_supply" value="{{ invoice.place_of_supply if invoice else '' }}" placeholder="e.g. 27">
+        </div>
+        <div class="form-group" style="display:flex; align-items:center; gap: 10px; margin-top: 25px;">
+          <input type="checkbox" name="reverse_charge" id="reverseCharge" {% if invoice and invoice.reverse_charge %}checked{% endif %} style="width: 18px; height: 18px; cursor: pointer;">
+          <label for="reverseCharge" style="margin-bottom:0; font-weight:600; cursor: pointer;">Subject to Reverse Charge</label>
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Notes</label>
+          <input type="text" name="notes" value="{{ invoice.notes if invoice else '' }}" placeholder="Optional notes">
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1; border-top: 1px solid #e2e8f0; margin-top: 10px; padding-top: 15px;">
+          <label style="color: #2563eb; font-weight: 700;">Instant Payment (Optional)</label>
+          <div style="display:flex; gap:10px;">
+            <div style="flex:1;">
+              <label style="font-size: 12px; color: var(--muted);">Amount Paid</label>
+              <input type="number" name="payment_amount" min="0" step="any" placeholder="0.00" style="background:var(--hover-bg); border-color:#2563eb;">
+            </div>
+            <div style="flex:1;">
+              <label style="font-size: 12px; color: var(--muted);">Payment Mode</label>
+              <select name="payment_mode" onchange="toggleBankSource(this, 'invNewBankSourceDiv')" style="background:var(--hover-bg); border-color:#2563eb;">
+                <option value="Cash">Cash</option>
+                <option value="Bank">Bank</option>
+              </select>
+            </div>
+            <div id="invNewBankSourceDiv" style="display: none; flex:1;">
+              <label style="font-size: 12px; color: var(--muted);">Bank Source</label>
+              <select name="bank_source" style="background:var(--hover-bg); border-color:#2563eb;">
+                <option value="Cheque">Cheque</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="UPI">UPI</option>
+              </select>
+            </div>
+          </div>
+          <small style="color: var(--muted); font-size: 11px;">Entering an amount here will automatically generate a receipt.</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="card invoice-totals">
+      <div class="summary-box">
+        <div class="summary-row"><span>Subtotal</span><span id="summarySubtotal">₹0.00</span></div>
+        <div class="summary-row" id="discountRow" style="display:none;color:#dc2626;"><span>Discount</span><span id="summaryDiscount">- ₹0.00</span></div>
+        <div class="summary-row" id="taxRow"><span>Tax Amount</span><span id="summaryTax">₹0.00</span></div>
+        <div class="summary-row total"><span>TOTAL</span><span id="summaryTotal">₹0.00</span></div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px;">
+        <button type="submit" class="btn btn-primary" style="flex:1">💾 Save Invoice</button>
+        <a href="{{ url_for('invoices') }}" class="btn btn-outline" style="flex:1">Cancel</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Items -->
+  
+
+</div>
+</form>
+
+<!-- Party Search Modal -->
+<div class="modal-overlay" id="partySearchModal">
+  <div class="modal" style="max-width: 600px;">
+    <div class="modal-title">Search Party</div>
+    <div style="margin-bottom: 15px;">
+       <input type="text" id="partySearchInput" placeholder="🔍 Type name or ID to search..." onkeyup="filterParties()" style="width: 100%; padding: 10px; font-size: 14px;">
+    </div>
+    <div class="table-wrapper" style="max-height: 300px; overflow-y: auto;">
+      <table class="items-table" style="width: 100%;">
+        <thead>
+          <tr><th>ID</th><th>Name</th><th>Type</th><th>Action</th></tr>
+        </thead>
+        <tbody id="partySearchBody">
+          {% for p in parties %}
+          <tr class="party-row">
+            <td>{{ p['id'] }}</td>
+            <td class="party-name">{{ p['name'] }}</td>
+            <td>{{ p['type']|title }}</td>
+            <td><button type="button" class="btn btn-sm btn-primary" onclick="selectParty({{ p['id'] }}, '{{ p['name'] }}')">Select</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-footer" style="margin-top: 15px; border-top: none;">
+       <button type="button" class="btn btn-outline" onclick="document.getElementById('partySearchModal').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Product Search Modal -->
+<div class="modal-overlay" id="productSearchModal">
+  <div class="modal" style="max-width: 600px;">
+    <div class="modal-title">Search Product</div>
+    <div style="margin-bottom: 15px;">
+       <input type="text" id="productSearchInput" placeholder="🔍 Type product name..." onkeyup="filterProducts()" style="width: 100%; padding: 10px; font-size: 14px;">
+       <input type="hidden" id="activeProductRowIdx">
+    </div>
+    <div class="table-wrapper" style="max-height: 300px; overflow-y: auto;">
+      <table class="items-table" style="width: 100%;">
+        <thead>
+          <tr><th>Product Name</th><th>Stock</th><th>Price (₹)</th><th>Action</th></tr>
+        </thead>
+        <tbody id="productSearchBody">
+          {% for prod in products %}
+          <tr class="product-row">
+            <td class="product-name">{{ prod['name'] }}</td>
+            <td>{{ prod['current_stock']|default(0) }}</td>
+            <td>{{ prod['price'] }}</td>
+            <td><button type="button" class="btn btn-sm btn-primary" onclick="selectProduct('{{ prod['name']|escape }}', {{ prod['price'] }})">Select</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-footer" style="margin-top: 15px; border-top: none;">
+       <button type="button" class="btn btn-outline" onclick="document.getElementById('productSearchModal').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+let rowIdx = 0;
+function addRow() {
+  const tbody = document.getElementById('itemsBody');
+  const tr = document.createElement('tr');
+  tr.id = 'row_' + rowIdx;
+  tr.innerHTML = `
+    <td style="display:flex; gap:5px; align-items:center;">
+      <input type="text" name="desc_${rowIdx}" id="desc_${rowIdx}" placeholder="Item description" required style="flex:1;">
+      <button type="button" class="btn btn-outline btn-sm" onclick="openProductModal(${rowIdx})" title="Search Product">🔍</button>
+    </td>
+    <td><input type="number" name="qty_${rowIdx}" value="1" min="0.01" step="any" oninput="calcRow(${rowIdx})" style="width:100%"></td>
+    <td><input type="number" name="rate_${rowIdx}" value="0" min="0" step="any" oninput="calcRow(${rowIdx})" style="width:100%"></td>
+    <td><input type="number" id="amt_${rowIdx}" value="0.00" readonly style="width:100%;background:var(--hover-bg);font-weight:600;"></td>
+    <td><button type="button" class="remove-row" onclick="removeRow(${rowIdx})">✕</button></td>
+  `;
+  tbody.appendChild(tr);
+  rowIdx++;
+}
+function removeRow(idx) {
+  const el = document.getElementById('row_' + idx);
+  if(el) el.remove();
+  recalc();
+}
+function calcRow(idx) {
+  const qty = parseFloat(document.querySelector(`[name=qty_${idx}]`)?.value) || 0;
+  const rate = parseFloat(document.querySelector(`[name=rate_${idx}]`)?.value) || 0;
+  const amt = qty * rate;
+  const el = document.getElementById('amt_' + idx);
+  if(el) el.value = amt.toFixed(2);
+  recalc();
+}
+function handleGst(type) {
+  const cgstEl = document.getElementById('cgstPct');
+  const sgstEl = document.getElementById('sgstPct');
+  const igstEl = document.getElementById('igstPct');
+  
+  if (type === 'cgst') {
+    let val = parseFloat(cgstEl.value) || 0;
+    if (val > 0) {
+      sgstEl.value = val;
+      igstEl.value = 0;
+      igstEl.readOnly = true;
+      igstEl.style.background = 'var(--hover-bg)';
+    } else {
+      sgstEl.value = 0;
+      igstEl.readOnly = false;
+      igstEl.style.background = '';
+    }
+  } else if (type === 'igst') {
+    let val = parseFloat(igstEl.value) || 0;
+    if (val > 0) {
+      cgstEl.value = 0;
+      sgstEl.value = 0;
+      cgstEl.readOnly = true;
+      cgstEl.style.background = 'var(--hover-bg)';
+    } else {
+      cgstEl.readOnly = false;
+      cgstEl.style.background = '';
+    }
+  }
+  recalc();
+}
+
+function recalc() {
+  let sub = 0;
+  document.querySelectorAll('[id^=amt_]').forEach(el => { sub += parseFloat(el.value)||0; });
+  
+  const discountPct = parseFloat(document.getElementById('discountPct').value) || 0;
+  const discountAmt = sub * (discountPct / 100);
+  const taxableAmt = sub - discountAmt;
+  
+  const cgstPct = parseFloat(document.getElementById('cgstPct').value) || 0;
+  const sgstPct = parseFloat(document.getElementById('sgstPct').value) || 0;
+  const igstPct = parseFloat(document.getElementById('igstPct').value) || 0;
+  
+  const taxAmt = taxableAmt * ((cgstPct + sgstPct + igstPct) / 100);
+  const total = taxableAmt + taxAmt;
+  
+  document.getElementById('summarySubtotal').textContent = '₹' + sub.toFixed(2);
+  
+  if (discountAmt > 0) {
+    document.getElementById('discountRow').style.display = 'flex';
+    document.getElementById('summaryDiscount').textContent = '- ₹' + discountAmt.toFixed(2);
+  } else {
+    document.getElementById('discountRow').style.display = 'none';
+  }
+  
+  document.getElementById('summaryTax').textContent = '₹' + taxAmt.toFixed(2);
+  document.getElementById('summaryTotal').textContent = '₹' + total.toFixed(2);
+}
+// Party Search Modal Functions
+function openPartyModal() {
+  document.getElementById('partySearchInput').value = '';
+  filterParties();
+  document.getElementById('partySearchModal').classList.add('open');
+  document.getElementById('partySearchInput').focus();
+}
+
+function filterParties() {
+  let filter = document.getElementById('partySearchInput').value.toLowerCase();
+  let rows = document.querySelectorAll('.party-row');
+  rows.forEach(row => {
+    let text = row.innerText.toLowerCase();
+    row.style.display = text.includes(filter) ? '' : 'none';
+  });
+}
+
+function selectParty(id, name) {
+  document.getElementById('partyId').value = id;
+  document.getElementById('partyName').value = name;
+  document.getElementById('partySearchModal').classList.remove('open');
+}
+
+// Product Search Modal Functions
+function openProductModal(idx) {
+  document.getElementById('activeProductRowIdx').value = idx;
+  document.getElementById('productSearchInput').value = '';
+  filterProducts();
+  document.getElementById('productSearchModal').classList.add('open');
+  document.getElementById('productSearchInput').focus();
+}
+
+function filterProducts() {
+  let filter = document.getElementById('productSearchInput').value.toLowerCase();
+  let rows = document.querySelectorAll('.product-row');
+  rows.forEach(row => {
+    let text = row.querySelector('.product-name').innerText.toLowerCase();
+    row.style.display = text.includes(filter) ? '' : 'none';
+  });
+}
+
+function selectProduct(name, price) {
+  let idx = document.getElementById('activeProductRowIdx').value;
+  document.getElementById('desc_' + idx).value = name;
+  document.querySelector(`[name=rate_${idx}]`).value = price;
+  calcRow(idx);
+  document.getElementById('productSearchModal').classList.remove('open');
+}
+// Initialize GST fields on load
+handleGst('cgst');
+handleGst('igst');
+
+// Start with one row or prefill existing items
+{% if items %}
+  const existingItems = {{ items|tojson }};
+  existingItems.forEach(it => {
+    addRow();
+    const idx = rowIdx - 1;
+    document.getElementById('desc_' + idx).value = it.description;
+    document.querySelector(`[name=qty_${idx}]`).value = it.qty;
+    document.querySelector(`[name=rate_${idx}]`).value = it.rate;
+    calcRow(idx);
+  });
+{% else %}
+  addRow();
+{% endif %}
+</script>
+{% endblock %}

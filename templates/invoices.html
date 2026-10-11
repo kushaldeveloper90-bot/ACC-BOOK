@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% block title %}Invoices{% endblock %}
+{% block page_title %}Sales / Invoices{% endblock %}
+{% block content %}
+<div style="margin-bottom: 20px;">
+  <a href="{{ url_for('accounts_hub') }}" class="btn btn-outline" style="padding: 6px 12px; font-size: 14px;">← Back to Accounts</a>
+</div>
+
+<div class="card mb-0">
+  <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+    <div class="card-title" style="margin:0;">All Invoices</div>
+    <div style="display:flex; gap:12px; align-items:center; flex:1; max-width:400px; position:relative;">
+      <span style="position:absolute; left:12px; color:var(--muted); pointer-events:none;">🔍</span>
+      <input type="text" id="invoiceSearch" onkeyup="filterTable('invoiceSearch', 'invoiceTable')" placeholder="Search invoices by number, date, or customer..." style="width:100%; border:1px solid var(--border); border-radius:8px; padding:10px 10px 10px 36px; background:var(--bg); color:var(--text);">
+    </div>
+    <a href="{{ url_for('new_invoice') }}" class="btn btn-primary" style="white-space:nowrap;">+ New Invoice</a>
+  </div>
+  {% if invoices %}
+  <div class="table-wrapper">
+    <table id="invoiceTable">
+      <thead>
+        <tr>
+          <th>#</th><th>Invoice No</th><th>Date</th><th>Party</th>
+          <th>Subtotal</th><th>Tax</th><th>Total</th><th>Status</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in invoices %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><a href="{{ url_for('view_invoice', inv_id=inv['id']) }}" style="color:var(--primary);font-weight:600;">{{ inv['invoice_no'] }}</a></td>
+          <td>{{ inv['invoice_date']|format_date }}</td>
+          <td>{{ inv['party_name'] }}</td>
+          <td class="text-right">₹{{ "{:,.2f}".format(inv['subtotal']) }}</td>
+          <td class="text-right">₹{{ "{:,.2f}".format(inv['tax_amount']) }}</td>
+          <td class="text-right fw-bold">₹{{ "{:,.2f}".format(inv['total']) }}</td>
+          <td><span class="badge badge-{{ inv['status'] }}">{{ inv['status']|title }}</span></td>
+          <td style="display:flex; gap:4px; align-items:center;">
+            <a href="{{ url_for('edit_invoice', inv_id=inv['id']) }}" class="btn btn-outline btn-sm" style="color:#0284c7; border-color:#bae6fd; background:#f0f9ff;">Edit</a>
+            <a href="{{ url_for('view_invoice', inv_id=inv['id']) }}" class="btn btn-outline btn-sm">View</a>
+            <form method="POST" action="{{ url_for('delete_invoice', inv_id=inv['id']) }}" onsubmit="return confirm('Delete this invoice entirely? This cannot be undone.')">
+              <button class="btn btn-danger-outline btn-sm">Del</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="empty-icon">🧾</div><p>No invoices yet. <a href="{{ url_for('new_invoice') }}">Create your first invoice</a></p></div>
+  {% endif %}
+</div>
+
+<div class="card mb-0" style="margin-top:24px;">
+  <div class="card-header">
+    <div class="card-title">Money Received (Receipts)</div>
+    <button class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('open')">+ Add Receipt</button>
+  </div>
+  {% if receipts %}
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Date</th><th>Customer</th><th>Mode</th><th>Receipt No</th><th>Notes</th><th>Amount Received</th><th style="text-align:center;">Action</th></tr>
+      </thead>
+      <tbody>
+        {% for r in receipts %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ r['receipt_date']|format_date }}</td>
+          <td>{{ r['party_name'] or '—' }}</td>
+          <td>{{ r['payment_mode'] }}</td>
+          <td>{{ r['reference_no'] or '—' }}</td>
+          <td>{{ r['notes'] or '—' }}</td>
+          <td class="text-right fw-bold">
+            <span style="color:#059669;">+ ₹{{ "{:,.2f}".format(r['amount']) }}</span>
+          </td>
+          <td class="text-center" style="display:flex; gap:4px; justify-content:center; align-items:center;">
+            <a href="{{ url_for('view_receipt', receipt_id=r['id']) }}" class="btn btn-outline btn-sm" style="padding:2px 8px; font-size:11px;">View</a>
+            <a href="{{ url_for('edit_receipt', receipt_id=r['id']) }}" class="btn btn-outline btn-sm" style="padding:2px 8px; font-size:11px; color:#0284c7; border-color:#bae6fd; background:#f0f9ff;">Edit</a>
+            <form method="POST" action="{{ url_for('delete_receipt', receipt_id=r['id']) }}" onsubmit="return confirm('Delete this record? This cannot be undone.')">
+              <button class="btn btn-danger-outline btn-sm">Del</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="empty-icon">📥</div><p>No receipts recorded yet.</p></div>
+  {% endif %}
+</div>
+
+<!-- Add Modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-title">Add Receipt (Money Received)</div>
+    <form method="POST" action="{{ url_for('add_receipt') }}">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Date *</label>
+          <input type="date" name="receipt_date" required value="">
+        </div>
+        <div class="form-group">
+          <label>Amount (₹) *</label>
+          <input type="number" name="amount" min="0" step="any" required placeholder="0.00">
+        </div>
+        <div class="form-group" style="grid-column: span 2;">
+          <label>Customer Name</label>
+          <input type="text" name="party_name" id="invPartyName" list="invCustomerList" placeholder="Type or select customer">
+          <datalist id="invCustomerList">
+            {% for p in parties %}
+            <option data-id="{{ p['id'] }}" value="{{ p['name'] }}"></option>
+            {% endfor %}
+          </datalist>
+          <input type="hidden" name="party_id" id="invPartyId" value="">
+          <script>
+            document.getElementById('invPartyName').addEventListener('input', function() {
+                var option = Array.from(document.getElementById('invCustomerList').options).find(o => o.value === this.value);
+                document.getElementById('invPartyId').value = option ? option.getAttribute('data-id') : '';
+            });
+          </script>
+        </div>
+        <div class="form-group">
+          <label>Payment Mode</label>
+        <select name="payment_mode" onchange="toggleBankSource(this, 'invBankSourceDiv')">
+            <option value="Cash">Cash</option>
+            <option value="Bank">Bank</option>
+          </select>
+        </div>
+        <div class="form-group" id="invBankSourceDiv" style="display: none;">
+          <label>Bank Source</label>
+          <select name="bank_source">
+            <option value="Cheque">Cheque</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="UPI">UPI</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Receipt No.</label>
+          <input type="text" name="reference_no" value="{{ next_no }}" placeholder="Auto-generated">
+        </div>
+        <div class="form-group full">
+          <label>Notes</label>
+          <textarea name="notes" placeholder="Additional details"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Receipt</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

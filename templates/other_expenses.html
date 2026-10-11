@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}Other Expenses{% endblock %}
+{% block page_title %}Other Expenses{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+  <a href="{{ url_for('incomes_expenses_hub') }}" class="btn btn-outline" style="padding: 6px 12px; font-size: 14px;">← Back to
+    Hub</a>
+</div>
+
+<div class="three-col" style="margin-bottom: 24px;">
+  <div class="stat-card" style="border-left: 4px solid var(--success); background: var(--card); padding: 16px;">
+    <div>
+      <div class="stat-value" style="color: #10b981;">₹{{ "{:,.2f}".format(total_paid) }}</div>
+      <div class="stat-label">Total Paid</div>
+    </div>
+  </div>
+  <div class="stat-card"
+    style="border-left: 4px solid var(--primary); background: var(--card); padding: 16px; display: flex; align-items: center; justify-content: center;">
+    <a href="{{ url_for('new_other_expense') }}" class="btn btn-primary" style="width: 100%; text-align: center;">+ Record
+      Expense</a>
+  </div>
+  <div class="stat-card" style="background: transparent; box-shadow: none;"></div>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <div class="table-wrapper">
+    <table class="items-table" style="width: 100%;">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Date</th>
+          <th>Category</th>
+          <th>Payee / Vendor</th>
+          <th>Description</th>
+          <th style="text-align: right;">Amount</th>
+          <th>Status</th>
+          <th style="text-align: center;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in other_expenses %}
+        <tr ondblclick="window.location.href='{{ url_for('edit_other_expense', exp_id=i['id']) }}'" style="cursor: pointer;" title="Double-click to edit">
+          <td>{{ loop.index }}</td>
+          <td>{{ i['exp_date']|format_date }}</td>
+          <td><span
+              style="background: var(--table-th-bg); padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">{{
+              i['category'] }}</span></td>
+          <td>{{ i['payee'] or '—' }}</td>
+          <td>{{ i['description'] or '—' }}</td>
+          <td align="right" style="font-weight: 600;">₹{{ "{:,.2f}".format(i['amount']) }}</td>
+          <td>
+            {% if i['status'] == 'Received' %}
+            <span class="badge" style="background:#dcfce7; color:#16a34a;">Received</span>
+            {% else %}
+            <span class="badge" style="background:#fee2e2; color:#ef4444;">Expected</span>
+            {% endif %}
+          </td>
+          <td align="center">
+            <form action="{{ url_for('delete_other_expense', exp_id=i['id']) }}" method="POST" style="display:inline;"
+              onsubmit="return confirm('Are you sure you want to delete this expense?');">
+              <button type="submit" class="btn btn-danger-outline btn-sm">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" align="center" style="padding: 40px; color: #94a3b8;">No other expenses recorded yet. Click "+ Record Expense" to start.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+

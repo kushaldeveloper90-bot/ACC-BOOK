@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Select Company</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body style="display:flex; align-items:center; justify-content:center; height:100vh; background:var(--bg);">
+  <div class="card" style="width: 100%; max-width: 500px;">
+    <div class="card-header" style="text-align: center;">
+      <h2 style="color: var(--primary); margin-bottom: 5px;">Select Company</h2>
+      <p style="color: var(--muted); font-size: 14px;">Choose a company to log into</p>
+    </div>
+    <div class="card-body">
+      
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert {{ category }}" style="margin-bottom: 15px;">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px;">
+        {% for c in companies %}
+        <a href="{{ url_for('set_company', comp_id=c['id']) }}" style="display: block; padding: 15px; border: 1px solid var(--border); border-radius: 8px; text-decoration: none; color: var(--text); background: var(--table-th-bg); transition: 0.2s;">
+          <div style="font-weight: 600; font-size: 16px;">🏢 {{ c['name'] }}</div>
+          <div style="font-size: 12px; color: var(--muted); margin-top: 4px;">Created: {{ c['created_at'].split(' ')[0] }}</div>
+        </a>
+        {% endfor %}
+      </div>
+
+      <hr style="border: none; border-top: 1px solid var(--border); margin: 20px 0;">
+
+      <form method="POST" action="{{ url_for('select_company') }}" style="display: flex; gap: 10px;">
+        <input type="text" name="company_name" placeholder="New Company Name..." required style="flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 6px;">
+        <button type="submit" class="btn btn-primary" style="white-space: nowrap;">+ Create</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

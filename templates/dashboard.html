@@ -1,0 +1,328 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content %}
+
+
+
+<div class="stats-grid">
+  {% if active_modules.get('invoices', True) %}
+  <div class="stat-card sales">
+    <div class="stat-icon">💰</div>
+    <div>
+      <div class="stat-value">₹{{ "{:,.2f}".format(total_sales) }}</div>
+      <div class="stat-label">Total Sales</div>
+    </div>
+  </div>
+  {% endif %}
+  {% if active_modules.get('purchases', True) %}
+  <div class="stat-card purchases">
+    <div class="stat-icon">🛒</div>
+    <div>
+      <div class="stat-value">₹{{ "{:,.2f}".format(total_purchases) }}</div>
+      <div class="stat-label">Total Purchases</div>
+    </div>
+  </div>
+  {% endif %}
+  {% if active_modules.get('expenses', True) %}
+  <div class="stat-card expenses">
+    <div class="stat-icon">📉</div>
+    <div>
+      <div class="stat-value">₹{{ "{:,.2f}".format(total_expenses) }}</div>
+      <div class="stat-label">Total Expenses</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="stat-card profit">
+    <div class="stat-icon">📈</div>
+    <div>
+      <div class="stat-value" style="color:{% if profit>=0 %}#28a745{% else %}#dc3545{% endif %}">₹{{ "{:,.2f}".format(profit) }}</div>
+      <div class="stat-label">Net Balance</div>
+    </div>
+  </div>
+  <div class="stat-card unpaid">
+    <div class="stat-icon">⏳</div>
+    <div>
+      <div class="stat-value">{{ unpaid_invoices }}</div>
+      <div class="stat-label">Unpaid Invoices</div>
+    </div>
+  </div>
+</div>
+
+<!-- Analytics Dashboard powered by Chart.js -->
+<div class="analytics-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+
+  <!-- Monthly Sales Trend (Line Chart) -->
+  <div class="card" style="margin-bottom: 0;">
+    <div class="card-header border-bottom-0 pb-0" style="padding-bottom: 0px;">
+      <div class="card-title" style="font-size: 15px;">📊 6-Month Revenue vs Expenses</div>
+    </div>
+    <div class="card-body" style="padding: 10px 24px; position: relative; height: 140px;">
+      {% if monthly_sales or monthly_expenses %}
+        <canvas id="salesLineChart"></canvas>
+      {% else %}
+        <div class="empty-state" style="height:100%;"><div class="empty-icon">📊</div><p>No financial data available</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Top Clients (Bar Chart) -->
+  <div class="card" style="margin-bottom: 0;">
+    <div class="card-header border-bottom-0 pb-0" style="padding-bottom: 0px;">
+      <div class="card-title" style="font-size: 15px;">🏆 Top 5 Clients by Sales</div>
+    </div>
+    <div class="card-body" style="padding: 10px 24px; position: relative; height: 140px;">
+      {% if top_clients %}
+        <canvas id="clientsBarChart"></canvas>
+      {% else %}
+        <div class="empty-state" style="height:100%;"><div class="empty-icon">👥</div><p>No client data yet</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Top Regions & Cities (Pie Chart) -->
+  <div class="card" style="margin-bottom: 0;">
+    <div class="card-header border-bottom-0" style="padding-bottom: 0px;">
+      <div class="card-title" style="font-size: 15px;">📍 State-wise Sales</div>
+    </div>
+    <div class="card-body" style="padding: 10px 24px 15px 24px; display:flex; flex-direction:column; gap:10px;">
+      {% if state_sales %}
+        <div style="position: relative; height: 110px; width: 100%; display: flex; justify-content: center;">
+          <canvas id="regionsPieChart"></canvas>
+        </div>
+        
+        <!-- Drill down cities -->
+        <div id="cityView" style="display: none; background: var(--table-th-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);">
+          <div style="font-size: 12px; font-weight: 700; color: var(--primary); margin-bottom: 8px; text-transform: uppercase; border-bottom: 2px solid var(--border); padding-bottom: 4px;" id="cityTitle">Cities</div>
+          <div id="cityList" style="display: flex; flex-direction: column; gap: 4px; max-height: 80px; overflow-y: auto;"></div>
+        </div>
+        <div id="clickHint" style="text-align:center; font-size:12px; color:var(--muted); font-style:italic;">💡 Click on a slice in the pie chart to view city details</div>
+      {% else %}
+        <div class="empty-state" style="height:250px;"><div class="empty-icon">🗺️</div><p>No regional data yet</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Top Products (Doughnut/Bar) -->
+  <div class="card" style="margin-bottom: 0;">
+    <div class="card-header border-bottom-0 pb-0" style="padding-bottom: 0px;">
+      <div class="card-title" style="font-size: 15px;">📦 Top Selling Products</div>
+    </div>
+    <div class="card-body" style="padding: 10px 24px; position: relative; height: 140px;">
+      {% if top_products %}
+        <canvas id="productsDoughnutChart"></canvas>
+      {% else %}
+        <div class="empty-state" style="height:100%;"><div class="empty-icon">🛍️</div><p>No product data yet</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
+<script>
+  // Get CSS vars for theming
+  const rootStyle = getComputedStyle(document.body);
+  const textColor = rootStyle.getPropertyValue('--text').trim() || '#94a3b8';
+  const gridColor = rootStyle.getPropertyValue('--border').trim() || 'rgba(148, 163, 184, 0.1)';
+
+  Chart.defaults.font.family = "'Inter', 'Segoe UI', sans-serif";
+  Chart.defaults.color = textColor;
+  Chart.defaults.scale.grid.color = gridColor;
+
+  {% if monthly_sales or monthly_expenses %}
+  // --- 1. Monthly Revenue vs Expenses Chart ---
+  const rawLabels = new Set([
+    {% for m in monthly_sales %}"{{ m['month'] }}",{% endfor %}
+    {% for m in monthly_expenses %}"{{ m['month'] }}",{% endfor %}
+  ]);
+  
+  const msLabels = Array.from(rawLabels).sort((a,b) => {
+    let [m1, y1] = a.split('/');
+    let [m2, y2] = b.split('/');
+    return new Date(y1, m1-1) - new Date(y2, m2-1);
+  });
+  
+  const rawSales = { {% for m in monthly_sales %}"{{ m['month'] }}": {{ m['total'] }}{% if not loop.last %},{% endif %}{% endfor %} };
+  const rawExpenses = { {% for m in monthly_expenses %}"{{ m['month'] }}": {{ m['total'] }}{% if not loop.last %},{% endif %}{% endfor %} };
+  
+  const msData = msLabels.map(l => rawSales[l] || 0);
+  const meData = msLabels.map(l => rawExpenses[l] || 0);
+  
+  new Chart(document.getElementById('salesLineChart'), {
+    type: 'line',
+    data: {
+      labels: msLabels,
+      datasets: [
+        {
+          label: 'Sales Revenue (₹)',
+          data: msData,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          borderWidth: 3,
+          pointBackgroundColor: '#ffffff',
+          pointBorderColor: '#3b82f6',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: true,
+          tension: 0.4
+        },
+        {
+          label: 'Expenses (₹)',
+          data: meData,
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          borderWidth: 3,
+          pointBackgroundColor: '#ffffff',
+          pointBorderColor: '#f59e0b',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: true,
+          tension: 0.4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { 
+        legend: { display: true, position: 'top', labels: { usePointStyle: true, boxWidth: 8 } } 
+      },
+      scales: {
+        y: { beginAtZero: true, border: {display: false} },
+        x: { grid: {display: false}, border: {display: false} }
+      }
+    }
+  });
+  {% endif %}
+
+  {% if top_clients %}
+  // --- 2. Top Clients Bar Chart ---
+  const tcLabels = [{% for c in top_clients %}"{{ c['party_name']|escape }}"{% if not loop.last %},{% endif %}{% endfor %}];
+  const tcData = [{% for c in top_clients %}{{ c['total_sales'] }}{% if not loop.last %},{% endif %}{% endfor %}];
+  
+  new Chart(document.getElementById('clientsBarChart'), {
+    type: 'bar',
+    data: {
+      labels: tcLabels,
+      datasets: [{
+        label: 'Sales (₹)',
+        data: tcData,
+        backgroundColor: '#10b981',
+        borderRadius: 6,
+        barPercentage: 0.6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, grid: {display: true}, border: {display: false} },
+        y: { grid: {display: false}, border: {display: false} }
+      }
+    }
+  });
+  {% endif %}
+
+  {% if state_sales %}
+  // --- 3. Regions Pie Chart & Drill Down ---
+  const rsLabels = [{% for s in state_sales %}"{{ s['state']|escape }}"{% if not loop.last %},{% endif %}{% endfor %}];
+  const rsData = [{% for s in state_sales %}{{ s['total_sales'] }}{% if not loop.last %},{% endif %}{% endfor %}];
+  const stateCities = {{ state_cities | tojson | safe if state_cities else '{}' }};
+  
+  const pieColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+  
+  const pieChart = new Chart(document.getElementById('regionsPieChart'), {
+    type: 'pie',
+    data: {
+      labels: rsLabels,
+      datasets: [{
+        data: rsData,
+        backgroundColor: pieColors,
+        borderWidth: 2,
+        borderColor: '#ffffff',
+        hoverOffset: 8
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right' }
+      },
+      onClick: (event, elements) => {
+        if (elements.length > 0) {
+          const index = elements[0].index;
+          const stateName = rsLabels[index];
+          showCities(stateName);
+        }
+      }
+    }
+  });
+
+  function showCities(stateName) {
+    const cityView = document.getElementById('cityView');
+    const cityTitle = document.getElementById('cityTitle');
+    const cityList = document.getElementById('cityList');
+    const clickHint = document.getElementById('clickHint');
+    
+    if(clickHint) clickHint.style.display = 'none';
+    
+    cityTitle.innerText = "Cities in " + stateName;
+    cityList.innerHTML = '';
+    
+    const cities = stateCities[stateName] || [];
+    
+    if (cities.length === 0) {
+      cityList.innerHTML = '<div style="font-size:13px; color:var(--muted);">No city data recorded for this state.</div>';
+    } else {
+      cities.forEach(c => {
+        cityList.innerHTML += `
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f1f5f9; padding-bottom:6px;">
+            <span style="font-size:14px; font-weight:500; color:var(--text);">${c.city}</span>
+            <span style="font-size:14px; font-weight:700; color:var(--primary);">₹${Number(c.sales).toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
+          </div>
+        `;
+      });
+    }
+    
+    cityView.style.display = 'block';
+  }
+  {% endif %}
+
+  {% if top_products %}
+  // --- 4. Top Products Doughnut Chart ---
+  const tpLabels = [{% for p in top_products %}"{{ p['description']|escape }}"{% if not loop.last %},{% endif %}{% endfor %}];
+  const tpData = [{% for p in top_products %}{{ p['total_revenue'] }}{% if not loop.last %},{% endif %}{% endfor %}];
+  
+  new Chart(document.getElementById('productsDoughnutChart'), {
+    type: 'doughnut',
+    data: {
+      labels: tpLabels,
+      datasets: [{
+        data: tpData,
+        backgroundColor: ['#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f97316'],
+        borderWidth: 2,
+        borderColor: '#ffffff',
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: {
+        legend: { position: 'bottom' }
+      }
+    }
+  });
+  {% endif %}
+</script>
+{% endblock %}

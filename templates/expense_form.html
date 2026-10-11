@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Edit Expense' if expense else 'Record Expense' }}{% endblock %}
+{% block page_title %}{{ 'Edit Expense' if expense else 'Record Expense' }}{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 0 auto;">
+  <form method="POST">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" name="exp_date" value="{{ expense['exp_date'] if expense else today }}" required>
+      </div>
+
+      <div class="form-group">
+        <label>Ref / Voucher No.</label>
+        <input type="text" name="ref_no" value="{{ expense['ref_no'] if expense else next_no }}" placeholder="Auto-generated if empty">
+      </div>
+      
+      <div class="form-group">
+        <label>Category</label>
+        <select name="category" required>
+          {% set cat = expense['category'] if expense else 'Office Expenses' %}
+          <option {% if cat == 'Office Expenses' %}selected{% endif %}>Office Expenses</option>
+          <option {% if cat == 'Rent' %}selected{% endif %}>Rent</option>
+          <option {% if cat == 'Salary' %}selected{% endif %}>Salary</option>
+          <option {% if cat == 'Utilities' %}selected{% endif %}>Utilities</option>
+          <option {% if cat == 'Travel' %}selected{% endif %}>Travel</option>
+          <option {% if cat == 'Meals & Entertainment' %}selected{% endif %}>Meals & Entertainment</option>
+          <option {% if cat == 'Maintenance' %}selected{% endif %}>Maintenance</option>
+          <option {% if cat == 'Other' %}selected{% endif %}>Other</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="grid-column: 1 / -1;">
+        <label>Payee / Vendor (Optional)</label>
+        <input type="text" name="payee" value="{{ expense['payee'] if expense else '' }}" placeholder="Who was this paid to?">
+      </div>
+
+      <div class="form-group">
+        <label>Amount (₹)</label>
+        <input type="number" name="amount" min="0" step="any" value="{{ expense['amount'] if expense else '' }}" required placeholder="0.00">
+      </div>
+
+      <div class="form-group" style="grid-column: 1 / -1;">
+        <label>Description</label>
+        <input type="text" name="description" value="{{ expense['description'] if expense else '' }}" placeholder="Brief detail about the expense">
+      </div>
+
+      <div class="form-group">
+        <label>Status</label>
+        <select name="status" id="statusSelect" onchange="togglePaymentMode()" required>
+          <option value="Paid" {% if expense and expense['status'] == 'Paid' %}selected{% endif %}>Paid</option>
+          <option value="Unpaid" {% if expense and expense['status'] == 'Unpaid' %}selected{% endif %}>Unpaid (Payable)</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="paymentModeDiv">
+        <label>Payment Mode</label>
+        <select name="payment_mode" onchange="toggleBankSource(this, 'expenseBankSourceDiv')">
+          {% set mode = expense['payment_mode'] if expense else 'Cash' %}
+          {% set is_bank = mode.startswith('Bank') %}
+          <option value="Cash" {% if not is_bank %}selected{% endif %}>Cash</option>
+          <option value="Bank" {% if is_bank %}selected{% endif %}>Bank</option>
+        </select>
+      </div>
+      
+      <div class="form-group" id="expenseBankSourceDiv" style="display: {% if is_bank %}block{% else %}none{% endif %};">
+        <label>Bank Source</label>
+        <select name="bank_source">
+          {% set bs = mode.split(' - ')[1] if is_bank and ' - ' in mode else '' %}
+          <option value="Cheque" {% if bs == 'Cheque' %}selected{% endif %}>Cheque</option>
+          <option value="Bank Transfer" {% if bs == 'Bank Transfer' %}selected{% endif %}>Bank Transfer</option>
+          <option value="UPI" {% if bs == 'UPI' %}selected{% endif %}>UPI</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top: 24px; display: flex; gap: 10px;">
+      <button type="submit" class="btn btn-primary" style="flex: 1;">💾 Save Expense</button>
+      <a href="{{ url_for('expenses') }}" class="btn btn-outline" style="flex: 1; text-align: center;">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+function togglePaymentMode() {
+  const status = document.getElementById('statusSelect').value;
+  const modeDiv = document.getElementById('paymentModeDiv');
+  if (status === 'Unpaid') {
+    modeDiv.style.display = 'none';
+  } else {
+    modeDiv.style.display = 'block';
+  }
+}
+// Run on load
+document.addEventListener('DOMContentLoaded', togglePaymentMode);
+</script>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% block title %}Payments (Money Out){% endblock %}
+{% block page_title %}Payments (Money Out){% endblock %}
+{% block content %}
+
+<div class="card mb-0">
+  <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+    <div class="card-title" style="margin:0;">Supplier Payments</div>
+    <div style="display:flex; gap:12px; align-items:center; flex:1; max-width:400px; position:relative;">
+      <span style="position:absolute; left:12px; color:var(--muted); pointer-events:none;">🔍</span>
+      <input type="text" id="paymentsSearch" onkeyup="filterTable('paymentsSearch', 'paymentsTable')" placeholder="Search payments by date, supplier, or notes..." style="width:100%; border:1px solid var(--border); border-radius:8px; padding:10px 10px 10px 36px; background:var(--bg); color:var(--text);">
+    </div>
+    <button class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('open')" style="white-space:nowrap;">+ Add Payment</button>
+  </div>
+  {% if payments %}
+  <div class="table-wrapper">
+    <table id="paymentsTable">
+      <thead>
+        <tr><th>#</th><th>Date</th><th>Supplier</th><th>Mode</th><th>Payment No</th><th>Notes</th><th>Amount Paid</th><th style="text-align:center;">Action</th></tr>
+      </thead>
+      <tbody>
+        {% for r in payments %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ r['receipt_date']|format_date }}</td>
+          <td>{{ r['party_name'] or '—' }}</td>
+          <td>{{ r['payment_mode'] }}</td>
+          <td>{{ r['reference_no'] or '—' }}</td>
+          <td>{{ r['notes'] or '—' }}</td>
+          <td class="text-right fw-bold">
+            <span style="color:#dc2626;">- ₹{{ "{:,.2f}".format(r['amount']) }}</span>
+          </td>
+          <td class="text-center" style="display:flex; gap:4px; justify-content:center; align-items:center;">
+            <a href="{{ url_for('view_receipt', receipt_id=r['id']) }}" class="btn btn-outline btn-sm" style="padding:2px 8px; font-size:11px;">View</a>
+            <form method="POST" action="{{ url_for('delete_receipt', receipt_id=r['id']) }}" onsubmit="return confirm('Delete this record? This cannot be undone.')">
+              <button class="btn btn-danger-outline btn-sm">Del</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="empty-icon">📤</div><p>No payments recorded yet.</p></div>
+  {% endif %}
+</div>
+
+<!-- Add Modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-title">Add Payment (Money Paid)</div>
+    <form method="POST" action="{{ url_for('add_payment') }}">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Date *</label>
+          <input type="date" name="payment_date" required value="{{ ''|default('') }}">
+        </div>
+        <div class="form-group">
+          <label>Amount (₹) *</label>
+          <input type="number" name="amount" min="0" step="any" required placeholder="0.00">
+        </div>
+        <div class="form-group" style="grid-column: span 2;">
+          <label>Supplier Name</label>
+          <input type="text" name="party_name" id="paymentPartyName" list="supplierList" placeholder="Type or select supplier">
+          <datalist id="supplierList">
+            {% for p in parties %}
+            <option data-id="{{ p['id'] }}" value="{{ p['name'] }}"></option>
+            {% endfor %}
+          </datalist>
+          <input type="hidden" name="party_id" id="paymentPartyId" value="">
+          <script>
+            document.getElementById('paymentPartyName').addEventListener('input', function() {
+                var option = Array.from(document.getElementById('supplierList').options).find(o => o.value === this.value);
+                document.getElementById('paymentPartyId').value = option ? option.getAttribute('data-id') : '';
+            });
+          </script>
+        </div>
+        <div class="form-group">
+          <label>Payment Mode</label>
+          <select name="payment_mode" onchange="toggleBankSource(this, 'paymentBankSourceDiv')">
+            <option value="Cash">Cash</option>
+            <option value="Bank">Bank</option>
+          </select>
+        </div>
+        <div class="form-group" id="paymentBankSourceDiv" style="display: none;">
+          <label>Bank Source</label>
+          <select name="bank_source">
+            <option value="Cheque">Cheque</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="UPI">UPI</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Payment No.</label>
+          <input type="text" name="reference_no" value="{{ next_no }}" placeholder="Auto-generated">
+        </div>
+        <div class="form-group full">
+          <label>Notes</label>
+          <textarea name="notes" placeholder="Additional details"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Payment</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

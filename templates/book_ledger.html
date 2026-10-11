@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="card mb-0" id="printArea">
+  <div class="card-header border-bottom-0" style="padding-bottom: 0;">
+    <div class="card-title">
+      {% if mode == 'Cash' %}💵{% else %}🏦{% endif %} {{ title }}
+    </div>
+    <div style="font-size: 14px; font-weight: 700; color: var(--text);">
+      Closing Balance: <span style="color: {% if closing >= 0 %}#10b981{% else %}#ef4444{% endif %};">₹{{ "{:,.2f}".format(closing) }}</span>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <form method="GET" style="display: flex; gap: 16px; margin-bottom: 16px; align-items: flex-end;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <label>From Date</label>
+        <input type="date" name="from_date" value="{{ from_date }}">
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label>To Date</label>
+        <input type="date" name="to_date" value="{{ to_date }}">
+      </div>
+      <div style="margin-bottom: 0;">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="{{ url_for('cash_book' if mode == 'Cash' else 'bank_book') }}" class="btn btn-outline" style="margin-left: 8px;">Clear</a>
+      </div>
+    </form>
+    <div class="table-wrapper mt-16">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Name / Description</th>
+            <th class="text-right">Money In (₹)</th>
+            <th class="text-right">Money Out (₹)</th>
+            <th class="text-right">Balance (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Opening Balance Row -->
+          <tr style="background: var(--table-th-bg); font-weight: 600;">
+            <td>-</td>
+            <td style="color: var(--primary);">Opening Balance</td>
+            <td class="text-right">-</td>
+            <td class="text-right">-</td>
+            <td class="text-right" style="color: {% if opening >= 0 %}#10b981{% else %}#ef4444{% endif %};">
+              ₹{{ "{:,.2f}".format(opening) }}
+            </td>
+          </tr>
+
+          {% for tx in transactions %}
+          <tr>
+            <td>{{ tx.date|format_date }}</td>
+            <td>
+              <div style="font-weight: 600; color: var(--text);">{{ tx.name }}</div>
+              <div style="font-size: 10px; color: var(--muted); text-transform: uppercase;">{{ tx.source }}</div>
+            </td>
+            <td class="text-right" style="color: #10b981; font-weight: 500;">
+              {% if tx.money_in > 0 %}{{ "{:,.2f}".format(tx.money_in) }}{% else %}-{% endif %}
+            </td>
+            <td class="text-right" style="color: #ef4444; font-weight: 500;">
+              {% if tx.money_out > 0 %}{{ "{:,.2f}".format(tx.money_out) }}{% else %}-{% endif %}
+            </td>
+            <td class="text-right" style="font-weight: 700; color: {% if tx.balance >= 0 %}#10b981{% else %}#ef4444{% endif %};">
+              {{ "{:,.2f}".format(tx.balance) }}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="text-center" style="padding: 30px; color: var(--muted);">
+              No {{ mode|lower }} transactions found.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="text-center" style="margin-top: 16px;">
+  <button onclick="exportToPDF('printArea', '{{ title|replace(' ', '-') }}.pdf')" class="btn btn-primary" style="background:#dc2626; border-color:#dc2626; margin-right:10px;">📥 Export PDF</button>
+  <button onclick="window.print()" class="btn btn-outline" style="margin-right:10px;">🖨️ Print</button>
+  <a href="{{ url_for('reports_hub') }}" class="btn btn-outline">⬅ Back to Reports</a>
+</div>
+
+<style>
+@media print {
+  .sidebar, .topbar, .alert, .btn, form { display: none !important; }
+  .main-content { margin-left: 0 !important; }
+  .content-area { padding: 0 !important; }
+}
+</style>
+{% endblock %}
