@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block auth_content %}
+<div class="login-page">
+  <div class="login-box" style="width: 440px; max-width: 95%;">
+    <div class="login-logo">
+      <div class="logo-icon">₹</div>
+      <h2>Register Your Business</h2>
+      <p>100% Private, Secure & Isolated Database</p>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    <form method="POST" action="{{ url_for('register') }}">
+      <div class="form-group" style="margin-bottom:14px;">
+        <label>Business / Company Name</label>
+        <input type="text" name="company_name" required autofocus placeholder="e.g. Field Tech Solutions">
+      </div>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label>Your Full Name</label>
+        <input type="text" name="full_name" required placeholder="e.g. Kushal Sawdai">
+      </div>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label>Username</label>
+        <input type="text" name="username" required placeholder="Choose your login username">
+      </div>
+      <div class="form-group" style="margin-bottom:18px;">
+        <label>Password</label>
+        <input type="password" name="password" required placeholder="Create a secure password">
+      </div>
+      <button type="submit" class="login-btn" style="margin-top: 5px;">Create Business & Get Started</button>
+    </form>
+    
+    <div style="text-align:center; margin-top: 20px; font-size: 13px;">
+      Already have an account? <a href="{{ url_for('login') }}" style="color: var(--primary); font-weight: 600; text-decoration: none;">Sign In here</a>
+    </div>
+
+    <div style="margin-top:20px; text-align:center; font-size:11px; color:var(--muted);">
+      🔒 Secure Multi-Tenant Architecture &bull; Personal Database
+    </div>
+  </div>
+</div>
+{% endblock %}

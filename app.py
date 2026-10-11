@@ -137,7 +137,42 @@ def init_system_db():
             install_id TEXT,
             company_limit INTEGER DEFAULT 1
         );
+        CREATE TABLE IF NOT EXISTS global_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            full_name TEXT,
+            company_id INTEGER NOT NULL,
+            db_filename TEXT NOT NULL,
+            role TEXT DEFAULT 'admin',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (company_id) REFERENCES companies(id)
+        );
     """)
+    conn.commit()
+
+    # Migrate existing users from company DBs into global_users
+    try:
+        user_count = c.execute("SELECT COUNT(*) as cnt FROM global_users").fetchone()['cnt']
+        if user_count == 0:
+            comps = c.execute("SELECT * FROM companies").fetchall()
+            for comp in comps:
+                p = os.path.join(INSTANCE_DIR, comp['db_filename'])
+                if os.path.exists(p):
+                    try:
+                        conn_c = sqlite3.connect(p)
+                        conn_c.row_factory = sqlite3.Row
+                        u_list = conn_c.execute("SELECT * FROM users").fetchall()
+                        for u in u_list:
+                            ex = c.execute("SELECT id FROM global_users WHERE LOWER(username)=LOWER(?)", (u['username'],)).fetchone()
+                            if not ex:
+                                c.execute("""INSERT INTO global_users (username, password, full_name, company_id, db_filename, role)
+                                             VALUES (?, ?, ?, ?, ?, ?)""",
+                                          (u['username'], u['password'], u['full_name'], comp['id'], comp['db_filename'], u['role']))
+                        conn_c.close()
+                    except Exception: pass
+            conn.commit()
+    except Exception: pass
     conn.commit()
 
     # Migrate logic if old accounting.db exists but companies is empty
@@ -525,7 +560,7 @@ def inject_modules():
 
 @app.before_request
 def enforce_modules():
-    if request.endpoint in ['static', 'login', 'logout', 'activate', 'modules', 'dashboard', 'select_company', 'set_company', 'activate_multi']:
+    if request.endpoint in ['static', 'login', 'logout', 'register', 'activate', 'modules', 'dashboard', 'select_company', 'set_company', 'activate_multi']:
         return
     try:
         conn = get_db()
@@ -559,7 +594,7 @@ def enforce_modules():
 
 @app.before_request
 def check_trial():
-    if request.endpoint in ['activate', 'static', 'activate_multi'] or request.path.startswith('/static'):
+    if request.endpoint in ['activate', 'static', 'register', 'activate_multi'] or request.path.startswith('/static'):
         return
     conn = get_system_db()
     lic = conn.execute("SELECT * FROM license_info WHERE id=1").fetchone()
@@ -603,7 +638,79 @@ def activate():
 
 # â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.route('/')
+def index():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    if request.method == 'POST':
+        company_name = request.form.get('company_name', '').strip()
+        full_name = request.form.get('full_name', '').strip()
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+
+        if not company_name or not full_name or not username or not password:
+            flash('All fields are required.', 'error')
+            return render_template('register.html')
+
+        if len(password) < 4:
+            flash('Password must be at least 4 characters.', 'error')
+            return render_template('register.html')
+
+        sys_conn = get_system_db()
+        existing = sys_conn.execute("SELECT id FROM global_users WHERE LOWER(username) = LOWER(?)", (username,)).fetchone()
+        if existing:
+            sys_conn.close()
+            flash('Username is already taken. Please choose another username.', 'error')
+            return render_template('register.html')
+
+        import re, uuid
+        safe_name = re.sub(r'[^a-zA-Z0-9_]', '', company_name.replace(' ', '_')).lower()[:20]
+        db_filename = f"company_{safe_name}_{uuid.uuid4().hex[:6]}.db"
+
+        c = sys_conn.cursor()
+        c.execute("INSERT INTO companies (name, db_filename) VALUES (?, ?)", (company_name, db_filename))
+        company_id = c.lastrowid
+
+        hashed = generate_password_hash(password)
+        c.execute("""
+            INSERT INTO global_users (username, password, full_name, company_id, db_filename, role)
+            VALUES (?, ?, ?, ?, ?, 'admin')
+        """, (username, hashed, full_name, company_id, db_filename))
+        sys_conn.commit()
+        sys_conn.close()
+
+        # Initialize the new company's database
+        init_db(db_filename)
+
+        # Setup company profile and admin user in the new database
+        comp_db_path = os.path.join(INSTANCE_DIR, db_filename)
+        comp_conn = sqlite3.connect(comp_db_path)
+        comp_conn.row_factory = sqlite3.Row
+        comp_c = comp_conn.cursor()
+        comp_c.execute("UPDATE company_profile SET name=? WHERE id=1", (company_name,))
+        comp_c.execute("INSERT OR REPLACE INTO users (username, password, full_name, role) VALUES (?, ?, ?, 'admin')",
+                       (username, hashed, full_name))
+        comp_conn.commit()
+        lu = comp_c.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+        comp_conn.close()
+
+        session['active_db'] = db_filename
+        session['company_name'] = company_name
+        user = User(lu['id'], lu['username'], lu['full_name'], lu['role'])
+        login_user(user)
+
+        flash(f"Welcome {full_name}! Your business '{company_name}' is set up successfully.", "success")
+        return redirect(url_for('dashboard'))
+
+    return render_template('register.html')
+
 @app.route('/select_company', methods=['GET', 'POST'])
+@login_required
 def select_company():
     conn = get_system_db()
     
@@ -685,20 +792,61 @@ def activate_multi():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if not session.get('active_db'):
-        return redirect(url_for('select_company'))
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     if request.method == 'POST':
-        username = request.form['username'].strip()
-        password = request.form['password']
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+
+        # 1. Look up in global_users (Multi-Tenant isolation)
+        sys_conn = get_system_db()
+        gu = sys_conn.execute("""
+            SELECT gu.*, c.name as company_name 
+            FROM global_users gu
+            LEFT JOIN companies c ON gu.company_id = c.id
+            WHERE LOWER(gu.username) = LOWER(?)
+        """, (username,)).fetchone()
+        sys_conn.close()
+
+        if gu and check_password_hash(gu['password'], password):
+            session['active_db'] = gu['db_filename']
+            session['company_name'] = gu['company_name'] or 'My Business'
+
+            comp_conn = get_db()
+            lu = comp_conn.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,)).fetchone()
+            if not lu:
+                comp_conn.execute("INSERT OR REPLACE INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)",
+                                  (gu['username'], gu['password'], gu['full_name'], gu['role']))
+                comp_conn.commit()
+                lu = comp_conn.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,)).fetchone()
+            comp_conn.close()
+
+            user = User(lu['id'], lu['username'], lu['full_name'], lu['role'])
+            login_user(user)
+            return redirect(url_for('dashboard'))
+
+        # 2. Fallback: Check local accounting.db for legacy accounts
         conn = get_db()
-        u = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+        u = conn.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,)).fetchone()
         conn.close()
         if u and check_password_hash(u['password'], password):
+            sys_conn = get_system_db()
+            active_comp = sys_conn.execute("SELECT id, name FROM companies WHERE db_filename = ?", (session.get('active_db', 'accounting.db'),)).fetchone()
+            comp_id = active_comp['id'] if active_comp else 1
+            comp_name = active_comp['name'] if active_comp else 'My Business'
+            try:
+                sys_conn.execute("""INSERT OR REPLACE INTO global_users (username, password, full_name, company_id, db_filename, role)
+                                     VALUES (?, ?, ?, ?, ?, ?)""",
+                                 (u['username'], u['password'], u['full_name'], comp_id, session.get('active_db', 'accounting.db'), u['role']))
+                sys_conn.commit()
+            except Exception: pass
+            sys_conn.close()
+
+            session['company_name'] = comp_name
             user = User(u['id'], u['username'], u['full_name'], u['role'])
             login_user(user)
             return redirect(url_for('dashboard'))
+
         flash('Invalid username or password.', 'error')
     return render_template('login.html')
 
